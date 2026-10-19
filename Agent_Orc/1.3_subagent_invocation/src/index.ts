@@ -2,12 +2,15 @@
 // Usage: npm start -- "your research topic"
 
 import { runCoordinator } from "./coordinator";
-import { loadAnthropicApiKey } from "../../../env";
+import { loadAnthropicApiKey, loadAnthropicModel } from "../../../env";
+import { LOG_FILE, logBanner, logRunError } from "./log";
 
 async function main() {
   console.log(`Using ANTHROPIC_API_KEY from ${loadAnthropicApiKey()}`);
+  console.log(`Model: ${loadAnthropicModel() ?? "SDK default (ANTHROPIC_MODEL not set)"}`);
 
   const topic = process.argv.slice(2).join(" ") || "The impact of heat pumps on household energy bills";
+  logBanner(topic, loadAnthropicModel());
   const { report, findings } = await runCoordinator(topic);
 
   console.log(`\nCollected ${findings.length} findings. All statements verified.\n`);
@@ -18,9 +21,12 @@ async function main() {
       .join("; ");
     console.log(`${i + 1}. ${s.text}\n   [${refs}]`);
   });
+  console.error(`\nFull run log: ${LOG_FILE}`);
 }
 
 main().catch((err) => {
+  logRunError(err);
   console.error(err instanceof Error ? err.message : err);
+  console.error(`\nFull run log: ${LOG_FILE}`);
   process.exit(1);
 });

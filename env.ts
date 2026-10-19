@@ -25,3 +25,22 @@ export function loadAnthropicApiKey(): ".env" | "terminal" {
     `${KEY_NAME} not found. Add it to .env (see example.env) or set it in the terminal.`
   );
 }
+
+const MODEL_NAME = "ANTHROPIC_MODEL";
+
+/**
+ * Reads the pinned model from .env (falling back to the terminal environment).
+ * Returns undefined when nothing is set, which leaves the SDK on its own default.
+ */
+export function loadAnthropicModel(): string | undefined {
+  const envPath = fileURLToPath(new URL(".env", import.meta.url));
+  if (existsSync(envPath)) {
+    const fromFile = parseEnv(readFileSync(envPath, "utf8"))[MODEL_NAME]?.trim();
+    if (fromFile) {
+      process.env[MODEL_NAME] = fromFile; // .env wins over the terminal
+      return fromFile;
+    }
+  }
+
+  return process.env[MODEL_NAME]?.trim() || undefined;
+}
