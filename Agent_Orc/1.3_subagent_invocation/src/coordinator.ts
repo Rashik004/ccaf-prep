@@ -38,6 +38,11 @@ Workflow:
    side by side. Every Agent call MUST pass "run_in_background": false, so the
    call returns the subagent's own JSON output instead of a launch receipt.
    Never spawn a background agent and never use SendMessage.
+   Each research prompt states ONLY the topic and scope: what to look for,
+   where to look, and what to leave out. Do NOT describe an output format, JSON
+   shape, field list or example values. Each subagent already has its own
+   output schema, and a schema in your prompt overrides it (for example, a
+   literal "source_url": null makes every finding fail validation).
 2. SYNTHESIS: once BOTH have returned, invoke the "synthesis" subagent. Its prompt
    MUST contain the COMPLETE JSON from both research subagents, copied verbatim.
    - Do NOT summarise, shorten, reformat or drop any finding.

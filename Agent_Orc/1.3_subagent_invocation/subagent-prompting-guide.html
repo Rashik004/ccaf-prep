@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subagent Prompting Guide</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c2430; --line:#2a3340;
+    --fg:#e6edf3; --dim:#9aa7b4; --faint:#6e7d8d; --pre:#0a0d12; --prefg:#cfd8e3;
+    --coord:#c9a227; --web:#4c9be8; --doc:#3fb27f; --synth:#a371f7; --verify:#e86a6a;
+    --mono:ui-monospace,"Cascadia Code","SF Mono",Consolas,monospace;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#f7f8fa; --panel:#ffffff; --panel2:#eef1f5; --line:#d8dee6;
+      --fg:#1b2129; --dim:#4f5b68; --faint:#6d7987; --pre:#f2f4f7; --prefg:#26303b;
+      --coord:#8a6a00; --web:#1f6fbf; --doc:#1d7f55; --synth:#7046c2; --verify:#bf3b3b;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:15px/1.6 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1120px;margin:0 auto;padding:40px 16px 80px}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:-.02em}
+  h2{font-size:21px;margin:52px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:15px;margin:24px 0 8px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+  .sub{color:var(--dim);margin:0 0 24px;font-size:14px}
+  code,.mono{font-family:var(--mono);font-size:13px}
+  p code, li code, td code{background:var(--panel2);padding:1px 5px;border-radius:4px}
+  .grid{display:grid;gap:14px}
+  .stats{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .two{grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+  .stat .n{font-size:24px;font-weight:600;font-family:var(--mono);display:block}
+  .stat .l{color:var(--faint);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin:10px 0}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--faint);font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+  td.num{font-family:var(--mono);white-space:nowrap}
+  .tbl{overflow-x:auto}
+  pre{background:var(--pre);border:1px solid var(--line);border-radius:8px;padding:14px;
+    overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.55;color:var(--prefg);
+    margin:10px 0;white-space:pre-wrap;word-break:break-word}
+  .tag{font-family:var(--mono);font-size:12px;padding:1px 7px;border-radius:5px;border:1px solid currentColor;white-space:nowrap}
+  .t-coord{color:var(--coord)} .t-web{color:var(--web)} .t-doc{color:var(--doc)}
+  .t-synth{color:var(--synth)} .t-verify{color:var(--verify)}
+  .agent{border-left:4px solid var(--line)}
+  .agent.coord{border-left-color:var(--coord)} .agent.web{border-left-color:var(--web)}
+  .agent.doc{border-left-color:var(--doc)} .agent.synth{border-left-color:var(--synth)}
+  .tech{list-style:none;padding:0;margin:8px 0}
+  .tech li{padding:7px 0;border-bottom:1px dashed var(--line)}
+  .tech li:last-child{border-bottom:0}
+  .tech b{display:inline-block;min-width:0}
+  .why{color:var(--dim);font-size:13.5px}
+  .hl{color:var(--coord);font-weight:600}
+  .note{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:14px;color:var(--dim)}
+  details{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin:12px 0}
+  summary{cursor:pointer;padding:12px 16px;font-weight:600}
+  details > div{padding:0 16px 14px}
+  nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+  nav a{font-size:13px;color:var(--dim);text-decoration:none;border:1px solid var(--line);padding:3px 10px;border-radius:999px}
+  nav a:hover{color:var(--fg)}
+  svg text{font-family:ui-sans-serif,"Segoe UI",sans-serif}
+  .diagram{overflow-x:auto}
+  .diagram svg{min-width:760px;width:100%;height:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Subagent Prompting &amp; Communication</h1>
+<p class="sub">Project <code>Agent_Orc/1.3_subagent_invocation</code> · latest run <code>logs/20261019-221746_run.log</code> · Claude Agent SDK coordinator + 3 subagents</p>
+
+<nav>
+  <a href="#prompt">1 · Prompt given</a>
+  <a href="#arch">2 · Architecture</a>
+  <a href="#techniques">3 · Prompting techniques</a>
+  <a href="#comms">4 · How agents communicate</a>
+  <a href="#examples">5 · Example prompts &amp; results</a>
+  <a href="#guards">6 · Code-side guardrails</a>
+</nav>
+
+<div class="grid stats">
+  <div class="card stat"><span class="n">316.5s</span><span class="l">wall time</span></div>
+  <div class="card stat"><span class="n">$1.149</span><span class="l">total cost</span></div>
+  <div class="card stat"><span class="n">4</span><span class="l">coordinator turns</span></div>
+  <div class="card stat"><span class="n">39</span><span class="l">findings (15 web + 24 doc)</span></div>
+  <div class="card stat"><span class="n">25</span><span class="l">cited statements</span></div>
+  <div class="card stat"><span class="n" style="color:var(--doc)">PASS</span><span class="l">parallel + attribution</span></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="prompt">1 · The prompt given</h2>
+
+<h3>User topic (CLI argument)</h3>
+<pre>npm start -- "Using the catalogs in documents/, compare wholesale prices, sizes and availability for Eastern Redbud (Cercis canadensis) across suppliers, and compare with published web sources on its hardiness zones and landscape use."</pre>
+
+<h3>What the coordinator actually receives (query prompt)</h3>
+<p>The topic is wrapped by <code>coordinator.ts</code> into a one-line task:</p>
+<pre>Research the following topic and produce a cited report: Using the catalogs in documents/, compare wholesale prices, sizes and availability for Eastern Redbud (Cercis canadensis) across suppliers, and compare with published web sources on its hardiness zones and landscape use.</pre>
+
+<h3>Run configuration</h3>
+<div class="tbl"><table>
+  <tr><th>Setting</th><th>Value</th><th>Effect</th></tr>
+  <tr><td>Model</td><td><code>claude-sonnet-5-5</code></td><td>Pinned via <code>ANTHROPIC_MODEL</code>. All 3 subagents log <code>(inherited from coordinator)</code>.</td></tr>
+  <tr><td><code>allowedTools</code></td><td><code>["Agent"]</code></td><td>Coordinator can only delegate. Cannot search or read itself.</td></tr>
+  <tr><td><code>agents</code></td><td><code>web-search</code>, <code>doc-analysis</code>, <code>synthesis</code></td><td>Key = name used in <code>subagent_type</code>.</td></tr>
+  <tr><td><code>CLAUDE_CODE_DISABLE_BACKGROUND_TASKS</code></td><td><code>"1"</code></td><td>Forces foreground subagents so tool_result carries real output, not a launch receipt.</td></tr>
+  <tr><td>Documents</td><td>10 supplier catalog PDFs in <code>documents/</code></td><td>Evidence for <code>doc-analysis</code>.</td></tr>
+</table></div>
+
+<!-- ============================================================ -->
+<h2 id="arch">2 · Architecture: hub and spoke</h2>
+<p>Coordinator is the only node that talks to anyone. Subagents never see each other; every byte of context moves through the coordinator's <code>Agent</code> tool calls.</p>
+
+<div class="card diagram">
+<svg viewBox="0 0 960 400" role="img" aria-label="Coordinator fans out to web-search and doc-analysis in parallel, then passes both outputs to synthesis">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--dim)"/>
+    </marker>
+  </defs>
+  <!-- user -->
+  <rect x="20" y="170" width="120" height="60" rx="8" fill="var(--panel2)" stroke="var(--line)"/>
+  <text x="80" y="196" text-anchor="middle" fill="var(--fg)" font-size="14" font-weight="600">index.ts</text>
+  <text x="80" y="214" text-anchor="middle" fill="var(--faint)" font-size="11">topic string</text>
+  <!-- coordinator -->
+  <rect x="190" y="150" width="170" height="100" rx="10" fill="var(--panel)" stroke="var(--coord)" stroke-width="2"/>
+  <text x="275" y="182" text-anchor="middle" fill="var(--coord)" font-size="15" font-weight="700">coordinator</text>
+  <text x="275" y="202" text-anchor="middle" fill="var(--dim)" font-size="11">tools: Agent only</text>
+  <text x="275" y="220" text-anchor="middle" fill="var(--dim)" font-size="11">turn 1: fan-out</text>
+  <text x="275" y="236" text-anchor="middle" fill="var(--dim)" font-size="11">turn 2: synthesis</text>
+  <!-- web -->
+  <rect x="470" y="40" width="190" height="90" rx="10" fill="var(--panel)" stroke="var(--web)" stroke-width="2"/>
+  <text x="565" y="70" text-anchor="middle" fill="var(--web)" font-size="15" font-weight="700">web-search</text>
+  <text x="565" y="90" text-anchor="middle" fill="var(--dim)" font-size="11">WebSearch, WebFetch</text>
+  <text x="565" y="108" text-anchor="middle" fill="var(--dim)" font-size="11">3 searches · 5 fetches · 89.5s</text>
+  <!-- doc -->
+  <rect x="470" y="270" width="190" height="90" rx="10" fill="var(--panel)" stroke="var(--doc)" stroke-width="2"/>
+  <text x="565" y="300" text-anchor="middle" fill="var(--doc)" font-size="15" font-weight="700">doc-analysis</text>
+  <text x="565" y="320" text-anchor="middle" fill="var(--dim)" font-size="11">Read, Grep, Glob</text>
+  <text x="565" y="338" text-anchor="middle" fill="var(--dim)" font-size="11">10 PDFs · 18 tool uses · 94.7s</text>
+  <!-- synth -->
+  <rect x="760" y="155" width="180" height="90" rx="10" fill="var(--panel)" stroke="var(--synth)" stroke-width="2"/>
+  <text x="850" y="185" text-anchor="middle" fill="var(--synth)" font-size="15" font-weight="700">synthesis</text>
+  <text x="850" y="205" text-anchor="middle" fill="var(--dim)" font-size="11">tools: none</text>
+  <text x="850" y="223" text-anchor="middle" fill="var(--dim)" font-size="11">25 statements · 96.3s</text>
+  <!-- arrows -->
+  <line x1="140" y1="200" x2="186" y2="200" stroke="var(--dim)" stroke-width="1.5" marker-end="url(#ar)"/>
+  <path d="M360 175 C410 150 420 95 466 88" fill="none" stroke="var(--web)" stroke-width="1.8" marker-end="url(#ar)"/>
+  <path d="M360 225 C410 250 420 305 466 312" fill="none" stroke="var(--doc)" stroke-width="1.8" marker-end="url(#ar)"/>
+  <text x="372" y="125" fill="var(--web)" font-size="11">Agent call (647 ch)</text>
+  <text x="372" y="290" fill="var(--doc)" font-size="11">Agent call (844 ch)</text>
+  <path d="M470 118 C420 140 400 170 364 185" fill="none" stroke="var(--web)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <path d="M470 282 C420 260 400 230 364 215" fill="none" stroke="var(--doc)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <text x="402" y="160" fill="var(--faint)" font-size="10">handback 9,008 ch</text>
+  <text x="402" y="250" fill="var(--faint)" font-size="10">handback 16,139 ch</text>
+  <path d="M360 200 C520 200 600 200 756 200" fill="none" stroke="var(--synth)" stroke-width="1.8" marker-end="url(#ar)"/>
+  <text x="590" y="192" text-anchor="middle" fill="var(--synth)" font-size="11">Agent call: 25,535 ch, both JSON verbatim</text>
+  <path d="M760 228 C640 240 450 240 364 232" fill="none" stroke="var(--synth)" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+  <text x="590" y="250" text-anchor="middle" fill="var(--faint)" font-size="10">handback 26,189 ch</text>
+  <!-- parallel bracket -->
+  <text x="680" y="200" fill="var(--faint)" font-size="10"> </text>
+  <text x="565" y="22" text-anchor="middle" fill="var(--coord)" font-size="11" font-weight="600">same turn msg_011CgBu1bK… → parallel</text>
+</svg>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="techniques">3 · Prompting techniques per agent</h2>
+<p>Each agent is an <code>AgentDefinition</code> with three parts: <code>description</code> (routing hint the coordinator reads), <code>prompt</code> (subagent system prompt) and scoped <code>tools</code>. Techniques below are pulled straight from <code>src/agents.ts</code> and <code>src/coordinator.ts</code>.</p>
+
+<!-- Coordinator -->
+<div class="card agent coord" style="margin-top:18px">
+  <span class="tag t-coord">coordinator</span> &nbsp;<span class="why">system prompt in <code>coordinator.ts</code> · tools <code>["Agent"]</code></span>
+  <div class="grid two" style="margin-top:12px">
+    <div>
+      <ul class="tech">
+        <li><b>Role + hard negative constraint.</b> <span class="why">"do NOT research topics yourself and must never answer from your own knowledge" — forces delegation.</span></li>
+        <li><b>Numbered workflow.</b> <span class="why">Explicit 3-step plan: parallel research → synthesis → return JSON.</span></li>
+        <li><b>Parallel fan-out instruction.</b> <span class="why">"in a SINGLE response, emit TWO Agent tool calls together" + reason (tasks independent).</span></li>
+        <li><b>Execution-mode pinning.</b> <span class="why"><code>"run_in_background": false</code>, never <code>SendMessage</code> — keeps output on the tool_result path.</span></li>
+        <li><b>Scope-only delegation.</b> <span class="why">Research prompts state topic, where to look, what to leave out — nothing else.</span></li>
+        <li><b>Don't override subagent contracts.</b> <span class="why">Bans output-format text in delegated prompts, with the failure it causes (<code>"source_url": null</code> breaks validation).</span></li>
+        <li><b>Verbatim context passing.</b> <span class="why">Synthesis prompt MUST contain COMPLETE JSON; lists the fields that may not be dropped.</span></li>
+        <li><b>Output contract.</b> <span class="why">"Return the synthesis subagent's JSON as your final answer, with nothing else."</span></li>
+      </ul>
+    </div>
+    <details open style="margin:0"><summary>Full system prompt</summary><div>
+<pre>You are a research coordinator.
+You do NOT research topics yourself and must never answer from your own knowledge.
+
+Workflow:
+1. PARALLEL RESEARCH: in a SINGLE response, emit TWO Agent tool calls together:
+   - one to "web-search"
+   - one to "doc-analysis"
+   These tasks are independent: both calls go in the same response so they run
+   side by side. Every Agent call MUST pass "run_in_background": false, so the
+   call returns the subagent's own JSON output instead of a launch receipt.
+   Never spawn a background agent and never use SendMessage.
+   Each research prompt states ONLY the topic and scope: what to look for,
+   where to look, and what to leave out. Do NOT describe an output format, JSON
+   shape, field list or example values. Each subagent already has its own
+   output schema, and a schema in your prompt overrides it (for example, a
+   literal "source_url": null makes every finding fail validation).
+2. SYNTHESIS: once BOTH have returned, invoke the "synthesis" subagent. Its prompt
+   MUST contain the COMPLETE JSON from both research subagents, copied verbatim.
+   - Do NOT summarise, shorten, reformat or drop any finding.
+   - Do NOT remove any field (source_url, document_name, page_number,
+     confidence, retrieved_by).
+3. Return the synthesis subagent's JSON as your final answer, with nothing else.</pre>
+    </div></details>
+  </div>
+</div>
+
+<!-- Web search -->
+<div class="card agent web" style="margin-top:18px">
+  <span class="tag t-web">web-search</span> &nbsp;<span class="why">tools <code>["WebSearch","WebFetch"]</code> · no file access, cannot spawn agents</span>
+  <div class="grid two" style="margin-top:12px">
+    <div>
+      <ul class="tech">
+        <li><b>Specialist persona.</b> <span class="why">"You are a web research specialist."</span></li>
+        <li><b>Explicit budget + stop rule.</b> <span class="why">≤3 searches, ≤5 fetches, ≤15 findings; "Stop once the budget is spent". Run used exactly 3 + 5.</span></li>
+        <li><b>Source-quality preference.</b> <span class="why">Government, academic, established institutions → result: UW Extension, UConn, UF/IFAS, UMN, Missouri BG.</span></li>
+        <li><b>Per-claim provenance.</b> <span class="why">Exact URL + page title for EVERY claim.</span></li>
+        <li><b>Anti-hallucination clause.</b> <span class="why">"If you cannot find a source… leave it out. Never invent a URL."</span></li>
+        <li><b>Injected JSON schema.</b> <span class="why"><code>FINDING_SCHEMA</code> templated into prompt; "ONLY valid JSON… No prose".</span></li>
+        <li><b>Field-fill rules.</b> <span class="why">Sets <code>agent</code>/<code>retrieved_by</code> literal, <code>page_number</code> null for web.</span></li>
+      </ul>
+      <p class="why"><b>Routing description:</b> "Searches the web for current information on a topic. Use for recent facts, statistics and published sources. Returns structured findings with source URLs and page titles."</p>
+    </div>
+    <details style="margin:0"><summary>Full system prompt</summary><div>
+<pre>You are a web research specialist.
+
+For the topic you are given:
+1. Run targeted web searches and open the most relevant pages.
+   Budget: at most 3 searches and 5 page fetches. Prefer authoritative
+   sources (government, academic, established institutions). Stop once the budget
+   is spent, even if questions remain open.
+2. Extract specific, factual claims. Do not paraphrase loosely.
+   Return at most 15 findings, the most relevant ones.
+3. For EVERY claim, record the exact URL and the page title it came from.
+4. If you cannot find a source for something, leave it out. Never invent a URL.
+
+Return ONLY valid JSON matching this schema. No prose before or after it:
+${FINDING_SCHEMA}
+Set "agent" and every "retrieved_by" to "web-search".
+Set document_name to the page title and page_number to null.</pre>
+    </div></details>
+  </div>
+</div>
+
+<!-- Doc analysis -->
+<div class="card agent doc" style="margin-top:18px">
+  <span class="tag t-doc">doc-analysis</span> &nbsp;<span class="why">tools <code>["Read","Grep","Glob"]</code> · read-only</span>
+  <div class="grid two" style="margin-top:12px">
+    <div>
+      <ul class="tech">
+        <li><b>Specialist persona.</b> <span class="why">"You are a document analysis specialist."</span></li>
+        <li><b>Page-level citation.</b> <span class="why">Document name + page number for EVERY claim.</span></li>
+        <li><b>Calibrated uncertainty.</b> <span class="why">"say so with null. Do not guess."</span></li>
+        <li><b>Edge-case rule for absence claims.</b> <span class="why">Rule 5 (uncommitted change in working tree): an absence claim still cites the page where it would appear. Fixes the "document citation without page number" attribution failure. Run: 4 "no Cercis" findings, all with page 1.</span></li>
+        <li><b>Least privilege.</b> <span class="why">"An analyst has no reason to modify evidence" → no Write/Edit/Bash.</span></li>
+        <li><b>Same injected schema</b> <span class="why">with <code>file://</code> URI as <code>source_url</code>.</span></li>
+      </ul>
+      <p class="why"><b>Routing description:</b> "Analyses local documents (reports, papers, PDFs) relevant to a topic. Use for evidence from provided files. Returns structured findings with document names and page references."</p>
+    </div>
+    <details style="margin:0"><summary>Full system prompt</summary><div>
+<pre>You are a document analysis specialist.
+
+For the topic you are given:
+1. Locate and read the relevant documents in the working directory.
+2. Extract specific claims, figures and conclusions.
+3. For EVERY claim, record the document name and the page number it appears on.
+4. If a page number cannot be determined, say so with null. Do not guess.
+5. A claim that a document LACKS something (e.g. "no listing for X") still has a
+   page: cite the page of the section where X would appear, or the page that
+   lists the document's sections. Never use null for an absence claim.
+
+Return ONLY valid JSON matching this schema. No prose before or after it:
+${FINDING_SCHEMA}
+Set "agent" and every "retrieved_by" to "doc-analysis".
+Set source_url to the file:// URI of the document, document_name to the file name,
+and page_number to the page the claim appears on (null only if truly unknown).</pre>
+    </div></details>
+  </div>
+</div>
+
+<!-- Synthesis -->
+<div class="card agent synth" style="margin-top:18px">
+  <span class="tag t-synth">synthesis</span> &nbsp;<span class="why">tools <code>[]</code> · works only from its prompt</span>
+  <div class="grid two" style="margin-top:12px">
+    <div>
+      <ul class="tech">
+        <li><b>Closed-book grounding.</b> <span class="why">"Use ONLY the findings you are given. Do not add facts from your own knowledge."</span></li>
+        <li><b>Zero tools as a prompt technique.</b> <span class="why">No way to fetch new, unattributed material — structural, not just instructed.</span></li>
+        <li><b>Copy-exact citations.</b> <span class="why">source_url, document_name, page_number copied "exactly as given" → string-matchable by <code>verify.ts</code>.</span></li>
+        <li><b>Conflict handling.</b> <span class="why">"If findings conflict, say so and cite both sides." Run: Wisconsin 4a vs UConn zone 5.</span></li>
+        <li><b>Multi-citation rule.</b> <span class="why">Merged statement cites all inputs. Run: one statement cites 6 web URLs.</span></li>
+        <li><b>Gated routing.</b> <span class="why">Description says "Use only after web-search and doc-analysis have both returned".</span></li>
+      </ul>
+    </div>
+    <details style="margin:0"><summary>Full system prompt</summary><div>
+<pre>You are a research synthesis specialist.
+
+You will receive research findings as JSON. Each finding has a claim and its source metadata.
+
+Rules:
+1. Use ONLY the findings you are given. Do not add facts from your own knowledge.
+2. Every statement you write MUST cite at least one finding, copying its source_url,
+   document_name and page_number exactly as given.
+3. If findings conflict, say so and cite both sides.
+4. If a statement merges several findings, cite all of them.
+
+Return ONLY valid JSON matching this schema:
+${SYNTHESIS_OUTPUT_SCHEMA}</pre>
+    </div></details>
+  </div>
+</div>
+
+<h3>Shared output contracts (<code>src/schema.ts</code>)</h3>
+<div class="grid two">
+<pre>// FINDING_SCHEMA → web-search, doc-analysis
+{
+  "agent": "web-search" | "doc-analysis",
+  "findings": [
+    {
+      "claim": string,
+      "source_url": string,
+      "document_name": string,
+      "page_number": number | null,
+      "confidence": "high" | "medium" | "low",
+      "retrieved_by": "web-search" | "doc-analysis"
+    }
+  ]
+}</pre>
+<pre>// SYNTHESIS_OUTPUT_SCHEMA → synthesis
+{
+  "summary": string,
+  "statements": [
+    {
+      "text": string,
+      "citations": [
+        { "source_url": string,
+          "document_name": string,
+          "page_number": number | null }
+      ]
+    }
+  ]
+}</pre>
+</div>
+<p class="note">Design point: content (<code>claim</code>) kept separate from attribution metadata. Metadata survives every hop because the coordinator is told to forward whole objects, never <code>.map(f =&gt; f.claim)</code>.</p>
+
+<h3>Technique matrix</h3>
+<div class="tbl"><table>
+  <tr><th>Technique</th><th><span class="tag t-coord">coord</span></th><th><span class="tag t-web">web</span></th><th><span class="tag t-doc">doc</span></th><th><span class="tag t-synth">synth</span></th></tr>
+  <tr><td>Role / persona</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+  <tr><td>Numbered steps</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+  <tr><td>Strict JSON schema in prompt</td><td>—</td><td>✓</td><td>✓</td><td>✓</td></tr>
+  <tr><td>"ONLY JSON, no prose"</td><td>✓ (final)</td><td>✓</td><td>✓</td><td>✓</td></tr>
+  <tr><td>Resource budget</td><td>—</td><td>✓ 3/5/15</td><td>—</td><td>—</td></tr>
+  <tr><td>Anti-hallucination clause</td><td>no own knowledge</td><td>never invent URL</td><td>don't guess page</td><td>only given findings</td></tr>
+  <tr><td>Edge-case rule</td><td>schema-override warning</td><td>—</td><td>absence claims</td><td>conflicts, merges</td></tr>
+  <tr><td>Tool scoping</td><td>Agent</td><td>web only</td><td>read-only</td><td>none</td></tr>
+  <tr><td>Reason given with rule</td><td>✓ many</td><td>—</td><td>✓</td><td>—</td></tr>
+</table></div>
+
+<!-- ============================================================ -->
+<h2 id="comms">4 · How agents communicate</h2>
+<p>No shared memory, no agent-to-agent messages. Only channel: coordinator's <code>Agent</code> <code>tool_use</code> (down) and the subagent's <code>SubagentHandback</code> report (up). Sequence from the latest log:</p>
+
+<div class="tbl"><table>
+  <tr><th>stream #</th><th>From → To</th><th>Message</th><th>Detail</th></tr>
+  <tr><td class="num">~24</td><td><span class="tag t-coord">coord</span></td><td>text</td><td>"Launching both research subagents in parallel."</td></tr>
+  <tr><td class="num">25–26</td><td><span class="tag t-coord">coord</span> → <span class="tag t-web">web</span> + <span class="tag t-doc">doc</span></td><td><code>tool_use name=Agent</code> ×2</td><td>Both in assistant msg <code>msg_011CgBu1bKRrn62kbPjJ6ZPy</code> → parallel. Input: <code>{subagent_type, description, prompt}</code></td></tr>
+  <tr><td class="num">—</td><td>SDK</td><td><code>system/task_started</code></td><td><code>is_backgrounded:false</code>, <code>spawn_depth:1</code>, <code>task_type:local_agent</code></td></tr>
+  <tr><td class="num">32–100</td><td><span class="tag t-web">web</span> / <span class="tag t-doc">doc</span> internal</td><td>inner <code>tool_use</code> (<code>parent_tool_use_id</code> set)</td><td>Interleaved: WebSearch ×3, WebFetch ×5 · Glob, Grep, Read ×15. Coordinator sees these only as stream noise.</td></tr>
+  <tr><td class="num">111</td><td><span class="tag t-web">web</span> → <span class="tag t-coord">coord</span></td><td><code>SubagentHandback</code></td><td>Real JSON payload (9,008 ch) carried on <code>message.tool_use_result.handbackReport.text</code></td></tr>
+  <tr><td class="num">—</td><td>SDK</td><td><code>tool_result</code> stub</td><td>349 ch pointer: "This agent's report was delivered to you as a message from "aab906b4de7bcbacd"…" + usage (18,522 tokens, 9 tool uses)</td></tr>
+  <tr><td class="num">118</td><td><span class="tag t-doc">doc</span> → <span class="tag t-coord">coord</span></td><td><code>SubagentHandback</code></td><td>16,139 ch JSON, 24 findings; stub 351 ch; 122,535 tokens, 18 tool uses</td></tr>
+  <tr><td class="num">~127</td><td><span class="tag t-coord">coord</span></td><td>text</td><td>"Both research subagents returned. Sending both complete JSON outputs to synthesis, copied verbatim."</td></tr>
+  <tr><td class="num">128</td><td><span class="tag t-coord">coord</span> → <span class="tag t-synth">synth</span></td><td><code>tool_use name=Agent</code></td><td>Prompt 25,535 ch = topic + both research JSON blobs pasted whole</td></tr>
+  <tr><td class="num">135</td><td><span class="tag t-synth">synth</span> → <span class="tag t-coord">coord</span></td><td><code>SubagentHandback</code></td><td>26,189 ch JSON, 25 statements; 31,381 tokens, 1 tool use (the handback itself)</td></tr>
+  <tr><td class="num">final</td><td><span class="tag t-coord">coord</span> → code</td><td><code>result/success</code></td><td>Synthesis JSON as <code>result</code> → <code>verifyParallelResearch</code>, <code>verifyAttribution</code>, <code>saveReport</code></td></tr>
+</table></div>
+
+<div class="grid two">
+  <div class="card">
+    <h3 style="margin-top:0">Down: Agent tool_use (coordinator → subagent)</h3>
+<pre>{
+  "type": "tool_use",
+  "id": "toolu_01KuXNVqSSD5VWHdCJrXvAnB",
+  "name": "Agent",
+  "input": {
+    "description": "Catalog analysis redbud pricing",
+    "subagent_type": "doc-analysis",
+    "prompt": "Topic: Eastern Redbud (Cercis canadensis). Scope: …"
+  }
+}</pre>
+    <p class="why">Subagent starts with a fresh context: its own system prompt + this <code>prompt</code> string. Nothing else from the coordinator's history.</p>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">Up: tool_result stub + handback</h3>
+<pre>// message.message.content[0]  (what the model "sees")
+{ "type": "tool_result",
+  "tool_use_id": "toolu_01UmTXAohFr1VFtE8G6MGy1q",
+  "content": [{ "type": "text", "text":
+    "This agent's report was delivered to you as a message
+     from \"aab906b4de7bcbacd\" (its SubagentHandback call).
+     Read it there; it is not repeated here. …" }] }
+
+// message.tool_use_result.handbackReport.text  (real payload)
+{"agent":"web-search","findings":[ … 15 findings … ]}</pre>
+    <p class="why"><code>coordinator.ts</code> prefers <code>handbackReport.text</code> when the message holds one tool_result; falls back to stub text otherwise.</p>
+  </div>
+</div>
+
+<div class="note" style="margin-top:14px">
+<b>Context-passing rule in practice.</b> Synthesis has zero tools and never saw the PDFs or web pages. Every fact it wrote came through the 25,535-char prompt. Because the coordinator pasted findings with all six fields intact, synthesis could copy <code>source_url</code> strings exactly, and <code>verify.ts</code> could match them against the 39 known findings.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="examples">5 · Example subagent prompts &amp; results (from the run)</h2>
+<p>Prompts below were written by the coordinator model at runtime, not by the developer. Note they follow the scope-only rule: no JSON shape mentioned.</p>
+
+<details open>
+  <summary><span class="tag t-web">web-search</span> &nbsp;"Web research redbud zones" · 647 chars → 15 findings in 89.5s</summary>
+  <div>
+    <h3>Prompt</h3>
+<pre>Topic: Eastern Redbud (Cercis canadensis). Scope: find published web sources on (1) its USDA hardiness zone range and (2) its landscape use (ornamental traits, mature size, sun and soil needs, typical placements such as specimen, understory, naturalistic or street planting, notable cultivars and known problems). Prefer authoritative sources: university extension services, botanical gardens and arboretums, USDA or US Forest Service, and reputable horticultural references. Look for several independent sources so that agreement or disagreement on hardiness zones can be compared. Leave out supplier prices, nursery catalogs and retail listings.</pre>
+    <h3>Inner tool calls</h3>
+<pre>WebSearch  "Cercis canadensis eastern redbud hardiness zones landscape use extension"
+WebSearch  "Cercis canadensis plant profile USDA zone mature size cultivars problems Missouri Botanical Garden"
+WebSearch  "Cercis canadensis Fact Sheet University of Florida IFAS OR NC State Extension OR Arbor Day Foundation"
+WebFetch   edis.ifas.ufl.edu/publication/ST145           → redirect, not followed
+WebFetch   hort.extension.wisc.edu/articles/eastern-redbud…  → read
+WebFetch   plantdatabase.uconn.edu/detail.php?pid=103    → read
+WebFetch   trees.umn.edu/eastern-redbud-cercis-canadensis → HTTP 403
+WebFetch   missouribotanicalgarden.org/PlantFinder/…      → connection refused
+SubagentHandback</pre>
+    <h3>Result sample (confidence: 10 high · 3 medium · 2 low)</h3>
+<pre>{"claim":"University of Wisconsin Extension Horticulture gives the hardiness range of eastern redbud as zones 4a to 9b. For zone 5a or colder it recommends local seed sources because trees from more southern areas may lack sufficient cold-hardiness. … (Page opened and read.)",
+ "source_url":"https://hort.extension.wisc.edu/articles/eastern-redbud-cercis-canadensis/",
+ "document_name":"Articles > Selection","page_number":null,"confidence":"high","retrieved_by":"web-search"}
+
+{"claim":"UConn Plant Database states the tree is 'hardy to zone 5 and protected, warm parts of 4' … This is a stricter northern limit than Wisconsin's 4a. (Page opened and read.)",
+ "source_url":"https://plantdatabase.uconn.edu/detail.php?pid=103",
+ "document_name":"College of Agriculture, Health and Natural Resources","page_number":null,"confidence":"high","retrieved_by":"web-search"}
+
+{"claim":"Iowa State University Extension (Natural Resources) is reported to give hardiness as zones 4 through 9 for Cercis canadensis. Taken from a search-result excerpt only. The page was not opened.",
+ "source_url":"https://naturalresources.extension.iastate.edu/tags/cercis-canadensis",
+ "document_name":"Eastern Redbud","page_number":null,"confidence":"low","retrieved_by":"web-search"}</pre>
+    <p class="why">Budget rule respected exactly (3 + 5). When fetches failed, agent kept excerpt-based claims but downgraded confidence and said why — calibrated, not invented.</p>
+  </div>
+</details>
+
+<details>
+  <summary><span class="tag t-doc">doc-analysis</span> &nbsp;"Catalog analysis redbud pricing" · 844 chars → 24 findings in 94.7s</summary>
+  <div>
+    <h3>Prompt</h3>
+<pre>Topic: Eastern Redbud (Cercis canadensis). Scope: analyse the supplier catalogs in the documents/ folder of the working directory (F:\Personal\ccaf-prep\Agent_Orc\1.3_subagent_invocation\documents). For every supplier catalog, find all entries for Eastern Redbud, including named cultivars and variants (for example Forest Pansy, Appalachian Red, Alba or similar). For each entry capture the wholesale price (and any quantity or price breaks), the available sizes or container and caliper specs, and availability or stock status, and note the supplier name, the document name and the page number. Note any hardiness zone or landscape-use statements that appear in the catalogs themselves. Also note when a supplier does not list the species or when the data conflicts between entries. Leave out all web sources and any plants other than Cercis.</pre>
+    <h3>Inner tool calls</h3>
+<pre>Glob  documents/**/*
+Read  01…05 catalogs  pages "1-20"        (first pass)
+Read  01 catalog (full)
+Grep  "Cercis|Redbud"  -i  output_mode=count   (find which files hit)
+Read  02 … 10 catalogs (full)
+SubagentHandback</pre>
+    <h3>Result sample (24 findings, all high confidence)</h3>
+<pre>{"claim":"Blue Ridge Plant Supply Co. (Asheville, NC; 2026-2027 Trade Catalog) lists Eastern Redbud (Cercis canadensis), SKU BR-1001, first in the TREES section. Price $177.52 per unit. Size is 2-inch caliper B&amp;B. Stock status is 'Available'. Volume breaks on the same page: 5% off at 25+ units of a single SKU, 10% off at 100+. Minimum order $500, net 30. … This is the highest price of the six listings.",
+ "source_url":"file:///F:/Personal/ccaf-prep/Agent_Orc/1.3_subagent_invocation/documents/02_blue-ridge-plant-supply-co_catalog.pdf",
+ "document_name":"02_blue-ridge-plant-supply-co_catalog.pdf","page_number":1,"confidence":"high","retrieved_by":"doc-analysis"}
+
+{"claim":"Greenleaf Wholesale Nursery description for Eastern Redbud (GW-1002): 'Native understory tree covered in rosy-purple blooms before leaves emerge. Heart-shaped foliage turns yellow in fall.' … The catalog gives no USDA hardiness zone for Cercis canadensis.",
+ "source_url":"file:///F:/…/documents/01_greenleaf-wholesale-nursery_catalog.pdf",
+ "document_name":"01_greenleaf-wholesale-nursery_catalog.pdf","page_number":1,"confidence":"high","retrieved_by":"doc-analysis"}</pre>
+    <p class="why">Absence claims ("no zone given", "no Cercis listed") carry <code>page_number: 1</code>, per the new rule 5. Earlier runs failed attribution on exactly this.</p>
+  </div>
+</details>
+
+<details>
+  <summary><span class="tag t-synth">synthesis</span> &nbsp;"Synthesize redbud cited report" · 25,535 chars → 25 statements in 96.3s</summary>
+  <div>
+    <h3>Prompt (head; body = both JSON outputs verbatim)</h3>
+<pre>Topic: Using the catalogs in documents/, compare wholesale prices, sizes and availability for Eastern Redbud (Cercis canadensis) across suppliers, and compare with published web sources on its hardiness zones and landscape use. Produce a single cited report. Below is the COMPLETE JSON output of both research subagents, verbatim.
+
+=== WEB-SEARCH OUTPUT ===
+{"agent":"web-search","findings":[{"claim":"University of Wisconsin Extension Horticulture gives …", … 15 findings …]}
+
+=== DOC-ANALYSIS OUTPUT ===
+{"agent":"doc-analysis","findings":[{"claim":"Greenleaf Wholesale Nursery (Hillsboro, OR; …", … 24 findings …]}</pre>
+    <h3>Result: summary</h3>
+<pre>Six of the ten supplier catalogs list Eastern Redbud (Cercis canadensis), all as the plain species with no named cultivar. Unit prices run from $74.30 (Evergreen Horizons, #7 container, 5-6 ft) to $177.52 (Blue Ridge, 2-inch caliper B&amp;B). Within each of the three size classes, prices differ between suppliers by about 3% to 15%. Only two suppliers, Blue Ridge and Evergreen Horizons, print a per-item stock status, and both say 'Available'. … No catalog gives a hardiness zone for the species. Published web sources give northern limits of zone 4 (…) or zone 5 with protected warm parts of zone 4 (UConn). … Several web findings come from search excerpts only or are low confidence, and these are flagged in the statements.</pre>
+    <h3>Result: statements (samples)</h3>
+<pre>{"text":"Size class #10 container, 6-7 ft: Sunbelt Landscape Supply (SL-1002) lists Eastern Redbud at $98.03 per unit, and Coastal Canopy Trees &amp; Shrubs (CC-1002) lists it at $112.97. Coastal Canopy is $14.94 (about 15%) higher for the identical size specification.",
+ "citations":[
+   {"source_url":"file:///…/06_sunbelt-landscape-supply_catalog.pdf","document_name":"06_sunbelt-landscape-supply_catalog.pdf","page_number":1},
+   {"source_url":"file:///…/04_coastal-canopy-trees-shrubs_catalog.pdf","document_name":"04_coastal-canopy-trees-shrubs_catalog.pdf","page_number":1}]}
+
+{"text":"Web sources disagree on the northern hardiness limit. University of Wisconsin Extension gives zones 4a to 9b. UConn says the tree is 'hardy to zone 5 and protected, warm parts of 4' …",
+ "citations":[
+   {"source_url":"https://hort.extension.wisc.edu/articles/eastern-redbud-cercis-canadensis/", …, "page_number":null},
+   {"source_url":"https://plantdatabase.uconn.edu/detail.php?pid=103", …, "page_number":null}]}
+
+{"text":"Both Wisconsin and UConn say seed source or genetic material matters in the cold end of the range. … Because the catalogs give no hardiness zone and name no cultivar, provenance is a question to put to suppliers if the planting is in zone 5 or colder.",
+ "citations":[ wisc.edu, uconn.edu, 01_greenleaf…pdf p.1 ]}</pre>
+    <p class="why">Shows rules 3 &amp; 4 at work: conflict stated with both sides cited; cross-source statement mixes web + document citations; medium/low-confidence findings flagged in text instead of dropped.</p>
+  </div>
+</details>
+
+<!-- ============================================================ -->
+<h2 id="guards">6 · Code-side guardrails backing the prompts</h2>
+<p>Prompts ask; code checks. Each instruction above has a deterministic enforcement point.</p>
+<div class="tbl"><table>
+  <tr><th>Prompt instruction</th><th>Enforced in</th><th>Check</th><th>This run</th></tr>
+  <tr><td>Emit both research calls in one response</td><td><code>verify.ts · verifyParallelResearch</code></td><td>Some assistant message id holds both <code>web-search</code> and <code>doc-analysis</code></td><td><span class="tag t-doc">pass</span></td></tr>
+  <tr><td><code>run_in_background: false</code></td><td><code>coordinator.ts</code> + env var</td><td>Throws on <code>Async agent launched successfully</code> receipt</td><td><span class="tag t-doc">pass</span></td></tr>
+  <tr><td>Return ONLY valid JSON (finding schema)</td><td><code>parse.ts · parseResearchResult</code></td><td>findings array; claim, source_url, retrieved_by present; page_number not undefined. Fail fast before synthesis.</td><td><span class="tag t-doc">15 + 24 parsed</span></td></tr>
+  <tr><td>Cite every statement</td><td><code>verify.ts · verifyAttribution</code> #1</td><td>≥1 citation with source_url</td><td><span class="tag t-doc">pass</span></td></tr>
+  <tr><td>Copy citations exactly / no invented sources</td><td><code>verifyAttribution</code> #2</td><td>source_url ∈ set of 39 known findings</td><td><span class="tag t-doc">pass</span></td></tr>
+  <tr><td>Page numbers for documents</td><td><code>verifyAttribution</code> #3</td><td><code>file://</code> citation must have page_number</td><td><span class="tag t-doc">pass</span></td></tr>
+  <tr><td>Synthesis uses only given findings</td><td><code>agents.ts</code> <code>tools: []</code></td><td>Structural: no tools to fetch anything new</td><td>1 tool use (handback only)</td></tr>
+</table></div>
+
+<h3>Cost &amp; token notes</h3>
+<div class="tbl"><table>
+  <tr><th>Model</th><th>Input</th><th>Output</th><th>Cache read</th><th>Cache write</th><th>Cost</th></tr>
+  <tr><td><code>claude-sonnet-5-5</code></td><td class="num">28</td><td class="num">64,396</td><td class="num">290,856</td><td class="num">174,698</td><td class="num">$1.1098</td></tr>
+  <tr><td><code>claude-haiku-5-5</code></td><td class="num">58,536</td><td class="num">6,241</td><td class="num">0</td><td class="num">0</td><td class="num">$0.0390</td></tr>
+</table></div>
+<p class="why">Haiku usage is not from any AgentDefinition; it lines up with the 3 web search requests and WebFetch page extraction done inside the tools. The coordinator re-sent ~13.7k tokens of research JSON as cache write when building the synthesis call — the price of verbatim context passing.</p>
+
+<div class="note" style="margin-top:24px">
+<b>Takeaways.</b> (1) Put output contracts in the subagent's own system prompt and forbid the coordinator from restating them. (2) Pass context as whole structured objects, never summaries. (3) Pair every "MUST" in a prompt with a code check that fails fast. (4) Use tool scoping as a prompting technique: an agent with no tools cannot hallucinate a fetch. (5) Handle the handback channel: the <code>tool_result</code> is a stub, the payload lives on <code>tool_use_result.handbackReport</code>.
+</div>
+
+</div>
+</body>
+</html>

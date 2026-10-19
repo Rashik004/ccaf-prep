@@ -93,6 +93,16 @@ The `--` forwards the topic to the program. Keep the topic in quotes. For a topi
 npm start -- "Compare the heat pump running costs in documents/report.pdf with published web sources."
 ```
 
+### Example prompt
+
+This prompt uses the supplier catalogs in `documents/` together with web sources:
+
+```sh
+npm start -- "Using the catalogs in documents/, compare wholesale prices, sizes and availability for Eastern Redbud (Cercis canadensis) across suppliers, and compare with published web sources on its hardiness zones and landscape use."
+```
+
+[`subagent-prompting-guide.html`](subagent-prompting-guide.html) walks through a run of this prompt: the prompting techniques used by each agent, how the agents communicate, and the prompts the coordinator sent to each subagent with their results.
+
 You can also use the built-in default topic:
 
 ```sh
@@ -107,9 +117,25 @@ The default is `The impact of heat pumps on household energy bills`.
 2. Each research agent returns findings with source metadata.
 3. The coordinator instructs the `synthesis` agent to combine the complete findings into a cited report.
 4. The program checks that both research agents were invoked in the same turn and that report statements cite sources returned by the researchers. Local document citations must include page numbers.
-5. If the checks pass, the terminal displays the finding count, a summary, and numbered statements with citations. The program does not save a report file automatically.
+5. If the checks pass, the terminal displays the finding count, a summary, and numbered statements with citations, and the program saves the same report as Markdown to `output/<timestamp>_report.md`.
 
 The success message `All statements verified` refers to these attribution checks. It does not independently establish that each statement is factually correct or supported by the cited passage.
+
+## Analysing the logs with Claude Code
+
+Every run writes a full log to `logs/<timestamp>_run.log`: a readable trace plus a JSON dump of every stream message, including each subagent's prompt, its tool calls and its handback report. These logs are large, so instead of reading them by hand you can ask [Claude Code](https://claude.com/claude-code) to analyse them. Open Claude Code in this directory and give it a prompt such as:
+
+```text
+Check the latest log file in logs/ and the code in src/. Write an HTML file that
+contains the prompt given, the prompting techniques for the different agents, how
+they communicate with each other, and some example prompts for the subagents with
+their results.
+```
+
+`subagent-prompting-guide.html` was produced this way. Other useful prompts:
+
+- `Why did the latest run in logs/ fail? Trace it back to the agent that caused it.`
+- `Compare the last two runs in logs/: prompts sent, findings returned, duration and cost.`
 
 ## Troubleshooting
 
@@ -136,5 +162,7 @@ The success message `All statements verified` refers to these attribution checks
 | `src/parse.ts` | Parses research output and checks the finding contract. |
 | `src/synthesis-prompt.ts` | Provides a helper for building a prompt from complete research JSON. |
 | `src/verify.ts` | Checks source attribution and parallel research invocation. |
+| `src/report.ts` | Saves the verified report as Markdown to `output/`. |
+| `subagent-prompting-guide.html` | Walkthrough of an example run: prompts, techniques, agent communication and results. |
 
 The coordinator enables subagent invocation with `allowedTools: ["Agent"]` and registers the named agents under `options.agents`. Research agents receive separate task context, so preserving the source metadata when passing findings to synthesis is central to this example.

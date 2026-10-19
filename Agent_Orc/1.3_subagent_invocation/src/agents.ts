@@ -16,7 +16,11 @@ export const webSearchAgent: AgentDefinition = {
 
 For the topic you are given:
 1. Run targeted web searches and open the most relevant pages.
+   Budget: at most 3 searches and 5 page fetches. Prefer authoritative
+   sources (government, academic, established institutions). Stop once the budget
+   is spent, even if questions remain open.
 2. Extract specific, factual claims. Do not paraphrase loosely.
+   Return at most 15 findings, the most relevant ones.
 3. For EVERY claim, record the exact URL and the page title it came from.
 4. If you cannot find a source for something, leave it out. Never invent a URL.
 
@@ -40,6 +44,9 @@ For the topic you are given:
 2. Extract specific claims, figures and conclusions.
 3. For EVERY claim, record the document name and the page number it appears on.
 4. If a page number cannot be determined, say so with null. Do not guess.
+5. A claim that a document LACKS something (e.g. "no listing for X") still has a
+   page: cite the page of the section where X would appear, or the page that
+   lists the document's sections. Never use null for an absence claim.
 
 Return ONLY valid JSON matching this schema. No prose before or after it:
 ${FINDING_SCHEMA}

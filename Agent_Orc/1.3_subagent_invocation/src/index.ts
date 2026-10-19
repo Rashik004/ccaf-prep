@@ -4,6 +4,7 @@
 import { runCoordinator } from "./coordinator";
 import { loadAnthropicApiKey, loadAnthropicModel } from "../../../env";
 import { LOG_FILE, logBanner, logRunError } from "./log";
+import { saveReport } from "./report";
 
 async function main() {
   console.log(`Using ANTHROPIC_API_KEY from ${loadAnthropicApiKey()}`);
@@ -21,7 +22,10 @@ async function main() {
       .join("; ");
     console.log(`${i + 1}. ${s.text}\n   [${refs}]`);
   });
-  console.error(`\nFull run log: ${LOG_FILE}`);
+
+  const reportPath = saveReport(topic, report, findings);
+  console.error(`\nReport saved to: ${reportPath}`);
+  console.error(`Full run log: ${LOG_FILE}`);
 }
 
 main().catch((err) => {
