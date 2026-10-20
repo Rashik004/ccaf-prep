@@ -2,7 +2,7 @@
 // Usage: npm start -- "your research topic"
 
 import { runCoordinator } from "./coordinator";
-import { loadAnthropicApiKey, loadAnthropicModel } from "../../../env";
+import { loadAnthropicApiKey, loadAnthropicModel } from "../../../common/env";
 import { LOG_FILE, logBanner, logRunError } from "./log";
 import { saveReport } from "./report";
 

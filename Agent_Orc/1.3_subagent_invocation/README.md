@@ -1,168 +1,92 @@
-# Subagent Invocation and Context Passing
+# 1.3 Subagent Invocation and Context Passing
 
-A TypeScript research example for **CCA-F Domain 1, Task Statement 1.3**. A coordinator asks two research agents to search the web and read local documents, then passes their structured findings to a synthesis agent to produce a cited report.
+Lesson: [1.3 Subagent Invocation and Context Passing](https://claudecertificationguide.com/learn/1-agentic-architecture/1-3-subagent-invocation-context)
 
-## Prerequisites
+A coordinator invokes two research subagents in parallel, one searching the web and one reading local documents, then passes their structured findings verbatim to a synthesis subagent that writes a cited report.
 
-- Node.js and npm.
-- An Anthropic API key with API access and available credits.
-- An internet connection for API requests and web research. Running the program uses the Anthropic API and can incur charges.
+Setup, API key, logging switches and generic troubleshooting are in the [root README](../../README.md).
 
-## 1. Install dependencies
+## What it builds
 
-Open a terminal in this project directory, alongside `package.json`, and run:
+1. The coordinator requests `web-search` and `doc-analysis` together in one model turn. The program fails the run if they ran sequentially.
+2. Each research agent returns findings with source metadata (URL or document plus page).
+3. The coordinator hands the complete findings to the `synthesis` agent, which writes a report where every statement cites a source.
+4. The program checks every citation points at a source the researchers returned, and that every local document citation has a page number.
+5. On success it prints the report to stdout and saves it as `output/<timestamp>_report.md`.
+
+`All statements verified` means the attribution checks passed. It does not prove each statement is factually supported by the cited passage.
+
+## Run
 
 ```sh
 npm install
-```
-
-## 2. Set your Anthropic API key
-
-The program looks for a key named **`ANTHROPIC_API_KEY`** in this order and uses the first one it finds:
-
-1. The `.env` file in the **repository root**, two levels above this directory. If it has a real key, that key is used even when the terminal also has one.
-2. The terminal's environment variables.
-
-If neither has a key, the program stops with an error.
-
-### Option A: `.env` file (recommended)
-
-Copy `example.env` to `.env` in the repository root and replace the placeholder value with your actual key:
-
-```sh
-ANTHROPIC_API_KEY="your-anthropic-api-key"
-```
-
-`.env` is listed in the root `.gitignore`. A `.env` that still holds the `YourAnthropicApiKey` placeholder is ignored, so the terminal key is used instead.
-
-### Option B: terminal environment variable
-
-Set the key in the terminal where you will run the program. Replace `your-anthropic-api-key` below with your actual key.
-
-**Windows PowerShell:**
-
-```powershell
-$env:ANTHROPIC_API_KEY = "your-anthropic-api-key"
-```
-
-**macOS / Linux (Bash or Zsh):**
-
-```sh
-export ANTHROPIC_API_KEY="your-anthropic-api-key"
-```
-
-These commands set the key for the current terminal session and the programs it starts. Set it again when you open a new terminal.
-
-**Do not paste the key into the source files or commit it to source control.**
-
-To check that the terminal variable is set without printing the key:
-
-```powershell
-# PowerShell: should print True
-[bool]$env:ANTHROPIC_API_KEY
-```
-
-```sh
-# Bash / Zsh
-test -n "$ANTHROPIC_API_KEY" && echo "Key is set"
-```
-
-## 3. Add local documents (optional)
-
-Place relevant reports, papers, or PDFs in the project directory, or a subdirectory such as `documents/`. Run the program from the project directory so the document agent can find them. You can mention particular filenames in your research topic.
-
-The coordinator invokes both research agents even if you provide no local documents. Use documents with identifiable page numbers when possible: the attribution check rejects local document citations that have no page number. Document content read by the agent is sent to the model, so use files you intend to share with the API.
-
-## 4. Check and run
-
-Check the TypeScript code without making an API call:
-
-```sh
 npm run typecheck
+npm start -- "<research topic>"
 ```
 
-Then run a research topic from the project directory (if you use a terminal variable instead of `.env`, run it **in the same terminal where you set the key**):
+Run from this folder so the document agent finds files in `documents/`.
 
-```sh
-npm start -- "What affects household heat pump running costs?"
-```
+### Example prompts
 
-The `--` forwards the topic to the program. Keep the topic in quotes. For a topic tied to a local document, first add the file, then run:
-
-```sh
-npm start -- "Compare the heat pump running costs in documents/report.pdf with published web sources."
-```
-
-### Example prompt
-
-This prompt uses the supplier catalogs in `documents/` together with web sources:
+Supplier catalogs in `documents/` plus web sources (the run in [RESULT.md](RESULT.md)):
 
 ```sh
 npm start -- "Using the catalogs in documents/, compare wholesale prices, sizes and availability for Eastern Redbud (Cercis canadensis) across suppliers, and compare with published web sources on its hardiness zones and landscape use."
 ```
 
-[`subagent-prompting-guide.html`](subagent-prompting-guide.html) walks through a run of this prompt: the prompting techniques used by each agent, how the agents communicate, and the prompts the coordinator sent to each subagent with their results.
+Web sources only:
 
-You can also use the built-in default topic:
+```sh
+npm start -- "What affects household heat pump running costs?"
+```
+
+A document you add yourself:
+
+```sh
+npm start -- "Compare the heat pump running costs in documents/report.pdf with published web sources."
+```
+
+No argument uses the default topic, `The impact of heat pumps on household energy bills`:
 
 ```sh
 npm start
 ```
 
-The default is `The impact of heat pumps on household energy bills`.
+### Local documents
 
-## What happens when it runs
+`documents/` ships ten supplier catalog PDFs. Add your own reports or PDFs there and name them in the topic. Prefer files with page numbers: the attribution check rejects document citations without one. Both researchers are invoked even when no document is relevant. Document content is sent to the model, so only add files you are willing to share with the API.
 
-1. The coordinator requests `web-search` and `doc-analysis` together in one model turn.
-2. Each research agent returns findings with source metadata.
-3. The coordinator instructs the `synthesis` agent to combine the complete findings into a cited report.
-4. The program checks that both research agents were invoked in the same turn and that report statements cite sources returned by the researchers. Local document citations must include page numbers.
-5. If the checks pass, the terminal displays the finding count, a summary, and numbered statements with citations, and the program saves the same report as Markdown to `output/<timestamp>_report.md`.
+## What to watch for
 
-The success message `All statements verified` refers to these attribution checks. It does not independently establish that each statement is factually correct or supported by the cited passage.
+- **Parallel invocation**: in the log, both `Agent` tool calls for `web-search` and `doc-analysis` sit in the same coordinator turn.
+- **Context passing**: each subagent prompt in the log is self-contained; subagents do not see the coordinator's conversation.
+- **Metadata preserved**: the synthesis prompt carries the researchers' findings verbatim, source fields included, so citations survive the handoff.
+- **Attribution check**: the closing trace lines list each statement with its citations and the verification result.
 
-## Analysing the logs with Claude Code
-
-Every run writes a full log to `logs/<timestamp>_run.log`: a readable trace plus a JSON dump of every stream message, including each subagent's prompt, its tool calls and its handback report. These logs are large, so instead of reading them by hand you can ask [Claude Code](https://claude.com/claude-code) to analyse them. Open Claude Code in this directory and give it a prompt such as:
-
-```text
-Check the latest log file in logs/ and the code in src/. Write an HTML file that
-contains the prompt given, the prompting techniques for the different agents, how
-they communicate with each other, and some example prompts for the subagents with
-their results.
-```
-
-`subagent-prompting-guide.html` was produced this way. Other useful prompts:
-
-- `Why did the latest run in logs/ fail? Trace it back to the agent that caused it.`
-- `Compare the last two runs in logs/: prompts sent, findings returned, duration and cost.`
+[`subagent-prompting-guide.html`](subagent-prompting-guide.html) walks through a run of the Redbud prompt: techniques per agent, how they communicate, and the prompts and results of each subagent. [`http-flow.html`](http-flow.html) shows the HTTP flow of a run.
 
 ## Troubleshooting
 
 | Problem | What to check |
 |---|---|
-| `npm` or `node` is not recognized | Install Node.js with npm, then reopen your terminal. |
-| `tsx` or a package cannot be found | Run `npm install` from the directory containing `package.json`. |
-| Authentication or API access fails | Check that `ANTHROPIC_API_KEY` is in the repo-root `.env` (with a real value, not the placeholder) or set in the terminal running the program, that the key is valid, and that its account has API access and credits. |
-| Documents are not found | Run from the project directory and check the filenames or paths in your topic. |
-| `Research subagents ran sequentially` | The model did not invoke both researchers in the same turn. The program rejects that run; retry the command. |
-| `Attribution check failed` | Read the reported issue. The report may contain missing or unknown citations, or a local document citation without a page number. |
-| `Could not parse ... output` | A research agent returned output that did not match the expected JSON contract; its findings may be missing from the final checks. |
+| Documents are not found | Run from this folder and check the paths in your topic. |
+| `Research subagents ran sequentially` | The model did not invoke both researchers in the same turn. The run is rejected; retry. |
+| `Attribution check failed` | Read the reported issue: a missing or unknown citation, or a document citation without a page number. |
+| `Could not parse ... output` | A research agent's output broke the JSON contract; its findings may be missing from the checks. |
 
 ## Source files
 
-| File | Purpose |
+| File | Role |
 |---|---|
-| `src/index.ts` | Reads the topic from command-line arguments and prints the report. |
-| `../../env.ts` (repo root) | Resolves `ANTHROPIC_API_KEY` from the root `.env` first, then the terminal. |
-| `src/coordinator.ts` | Runs the coordinator, captures research results, and calls the verification functions. |
-| `src/agents.ts` | Defines the web research, document analysis, and synthesis agents and their scoped tools. |
-| `src/types.ts` | Defines findings, source metadata, and synthesis output types. |
-| `src/schema.ts` | Defines the JSON contracts included in agent prompts. |
+| `src/index.ts` | Reads the topic from the arguments and prints the report. |
+| `src/coordinator.ts` | Runs the coordinator, captures research results, calls the checks. |
+| `src/agents.ts` | Defines the web research, document analysis and synthesis agents and their scoped tools. |
+| `src/types.ts` | Findings, source metadata and synthesis output types. |
+| `src/schema.ts` | JSON contracts included in the agent prompts. |
 | `src/parse.ts` | Parses research output and checks the finding contract. |
-| `src/synthesis-prompt.ts` | Provides a helper for building a prompt from complete research JSON. |
-| `src/verify.ts` | Checks source attribution and parallel research invocation. |
+| `src/synthesis-prompt.ts` | Builds the synthesis prompt from the complete research JSON. |
+| `src/verify.ts` | Checks source attribution and parallel invocation. |
 | `src/report.ts` | Saves the verified report as Markdown to `output/`. |
-| `subagent-prompting-guide.html` | Walkthrough of an example run: prompts, techniques, agent communication and results. |
+| `src/log.ts` | This lesson's trace events (agent calls, handbacks, findings, attribution) on top of `common/log.ts`. |
 
-The coordinator enables subagent invocation with `allowedTools: ["Agent"]` and registers the named agents under `options.agents`. Research agents receive separate task context, so preserving the source metadata when passing findings to synthesis is central to this example.
+The coordinator enables subagents with `allowedTools: ["Agent"]` and registers the named agents under `options.agents`.

@@ -6,17 +6,13 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { fileStamp } from "../../../common/stamp";
 import type { Finding, SynthesisOutput } from "./types";
 
 function defaultReportPath(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, "0");
-  const stamp =
-    `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}` +
-    `-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
   // output/ sits next to src/, whatever the cwd
   const outputDir = fileURLToPath(new URL("../output/", import.meta.url));
-  return resolve(outputDir, `${stamp}_report.md`);
+  return resolve(outputDir, `${fileStamp()}_report.md`);
 }
 
 export const REPORT_FILE = process.env.AGENT_REPORT_FILE
@@ -48,7 +44,7 @@ function toMarkdown(topic: string, report: SynthesisOutput, findings: Finding[])
   return lines.join("\n");
 }
 
-/** Writes the verified report to OUTPUT_FILE and returns the path written. */
+/** Writes the verified report to REPORT_FILE and returns the path written. */
 export function saveReport(topic: string, report: SynthesisOutput, findings: Finding[]): string {
   mkdirSync(dirname(REPORT_FILE), { recursive: true });
   writeFileSync(REPORT_FILE, toMarkdown(topic, report, findings), "utf8");

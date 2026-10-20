@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subagent HTTP Flow</title>
+<style>
+:root{
+  --bg:#f7f6f2; --card:#ffffff; --ink:#1d1d1b; --muted:#6a6a64; --line:#d8d6cf;
+  --coord:#2f5fb3; --coord-bg:#e7eefb; --api:#7a4fb0; --api-bg:#f1eafa;
+  --sub:#2e7d4f; --sub-bg:#e5f4ea; --warn:#b3412f; --warn-bg:#fbe9e5; --code-bg:#f0efe9;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16171a; --card:#1f2024; --ink:#ecebe6; --muted:#a3a29b; --line:#3a3b40;
+    --coord:#86a9ef; --coord-bg:#1f2b44; --api:#c3a2ec; --api-bg:#2d2340;
+    --sub:#7fcf9e; --sub-bg:#1d3326; --warn:#ef8e7c; --warn-bg:#3d2420; --code-bg:#26272c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16171a; --card:#1f2024; --ink:#ecebe6; --muted:#a3a29b; --line:#3a3b40;
+  --coord:#86a9ef; --coord-bg:#1f2b44; --api:#c3a2ec; --api-bg:#2d2340;
+  --sub:#7fcf9e; --sub-bg:#1d3326; --warn:#ef8e7c; --warn-bg:#3d2420; --code-bg:#26272c;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:32px 16px 64px}
+h1{font-size:1.8rem;margin:0 0 4px}
+h2{font-size:1.25rem;margin:40px 0 8px;padding-top:8px;border-top:1px solid var(--line)}
+h2 .n{color:var(--muted);font-weight:500;margin-right:6px}
+p{margin:6px 0}
+.sub{color:var(--muted);margin-bottom:20px}
+.note{background:var(--warn-bg);border-left:4px solid var(--warn);padding:10px 14px;border-radius:6px;margin:16px 0;font-size:.95rem}
+.fig{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin:14px 0;overflow-x:auto}
+.fig svg{display:block;width:100%;min-width:680px;height:auto}
+ul.rules{margin:8px 0;padding-left:20px}
+ul.rules li{margin:3px 0}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:4px}
+table{border-collapse:collapse;width:100%;font-size:.9rem;margin:10px 0}
+.tw{overflow-x:auto}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600}
+td code{white-space:nowrap}
+/* SVG tokens */
+svg text{fill:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+svg .mono{font-family:ui-monospace,Consolas,monospace}
+svg .mut{fill:var(--muted)}
+svg .ln{stroke:var(--ink);stroke-width:1.4;fill:none}
+svg .life{stroke:var(--line);stroke-width:2;stroke-dasharray:4 4}
+svg .dash{stroke:var(--muted);stroke-width:1.4;stroke-dasharray:5 4;fill:none}
+svg .ah{fill:var(--ink)}
+svg .ahm{fill:var(--muted)}
+svg .bc{fill:var(--coord-bg);stroke:var(--coord);stroke-width:1.5}
+svg .ba{fill:var(--api-bg);stroke:var(--api);stroke-width:1.5}
+svg .bs{fill:var(--sub-bg);stroke:var(--sub);stroke-width:1.5}
+svg .bw{fill:var(--warn-bg);stroke:var(--warn);stroke-width:1.5}
+svg .bn{fill:var(--card);stroke:var(--line);stroke-width:1.2}
+svg .tc{fill:var(--coord)} svg .ta{fill:var(--api)} svg .ts{fill:var(--sub)} svg .tw{fill:var(--warn)}
+svg .par{fill:none;stroke:var(--sub);stroke-width:1.2;stroke-dasharray:3 3}
+</style>
+</head>
+<body>
+<main>
+
+<h1>Subagent calls: the HTTP view</h1>
+<p class="sub">Task 1.3 · run log <code>Log/20261020-001706_run.log</code> · 2026-10-19 · model <code>claude-sonnet-5-5</code></p>
+
+<div class="note"><b>Caution.</b> The run log does not record the raw HTTP bodies. The request bodies on this page are reconstructed from log fields. Each value in the evidence table (section 6) comes from the log.</div>
+
+<h2><span class="n">1</span>Overview</h2>
+<p>The API does not keep state. The model does not start a subagent. The model only writes a request for one. The client (Claude Code CLI) does the work and sends a new POST.</p>
+<p>The run uses 14 POST requests to <code>/v1/messages</code>: 3 for the coordinator and 11 for the subagents.</p>
+
+<div class="fig">
+<svg viewBox="0 0 900 700" role="img" aria-label="Sequence of HTTP calls between coordinator, API and subagents">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ahm" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <!-- heads -->
+  <rect class="bc" x="50" y="14" width="200" height="44" rx="8"/>
+  <text x="150" y="34" text-anchor="middle" font-weight="600">Coordinator loop</text>
+  <text x="150" y="50" text-anchor="middle" font-size="11" class="mut">client: Claude Code CLI</text>
+  <rect class="ba" x="350" y="14" width="200" height="44" rx="8"/>
+  <text x="450" y="34" text-anchor="middle" font-weight="600">Messages API</text>
+  <text x="450" y="50" text-anchor="middle" font-size="11" class="mut">POST /v1/messages</text>
+  <rect class="bs" x="650" y="14" width="200" height="44" rx="8"/>
+  <text x="750" y="34" text-anchor="middle" font-weight="600">Subagent loops</text>
+  <text x="750" y="50" text-anchor="middle" font-size="11" class="mut">client: same CLI process</text>
+  <line class="life" x1="150" y1="58" x2="150" y2="690"/>
+  <line class="life" x1="450" y1="58" x2="450" y2="690"/>
+  <line class="life" x1="750" y1="58" x2="750" y2="690"/>
+
+  <!-- POST 1 -->
+  <line class="ln" x1="150" y1="95" x2="446" y2="95" marker-end="url(#a)"/>
+  <text x="300" y="88" text-anchor="middle" font-size="12"><tspan font-weight="600" class="tc">POST #1</tspan> system + tools[] (agent list) + task</text>
+  <line class="ln" x1="450" y1="135" x2="154" y2="135" marker-end="url(#a)"/>
+  <text x="300" y="121" text-anchor="middle" font-size="12">tool_use web-search + tool_use doc-analysis</text>
+  <text x="300" y="148" text-anchor="middle" font-size="11" class="mut mono">stop_reason: "tool_use"</text>
+
+  <line class="dash" x1="150" y1="178" x2="746" y2="178" marker-end="url(#am)"/>
+  <text x="600" y="171" text-anchor="middle" font-size="12" class="ts">start 2 subagents at the same time</text>
+
+  <!-- parallel box -->
+  <rect class="par" x="400" y="192" width="430" height="148" rx="6"/>
+  <text x="820" y="208" text-anchor="end" font-size="11" class="ts" font-weight="600">parallel</text>
+  <line class="ln" x1="750" y1="222" x2="454" y2="222" marker-end="url(#a)"/>
+  <text x="600" y="216" text-anchor="middle" font-size="12">web-search POST ×n</text>
+  <line class="ln" x1="450" y1="246" x2="746" y2="246" marker-end="url(#a)"/>
+  <text x="600" y="262" text-anchor="middle" font-size="11" class="mut">tool_use WebSearch / WebFetch … end_turn</text>
+  <line class="ln" x1="750" y1="290" x2="454" y2="290" marker-end="url(#a)"/>
+  <text x="600" y="284" text-anchor="middle" font-size="12">doc-analysis POST ×n</text>
+  <line class="ln" x1="450" y1="314" x2="746" y2="314" marker-end="url(#a)"/>
+  <text x="600" y="330" text-anchor="middle" font-size="11" class="mut">tool_use Glob / Read … end_turn</text>
+
+  <line class="dash" x1="750" y1="365" x2="154" y2="365" marker-end="url(#am)"/>
+  <text x="450" y="358" text-anchor="middle" font-size="12" class="ts">final text of each subagent → 2 tool_result blocks</text>
+
+  <!-- POST 2 -->
+  <line class="ln" x1="150" y1="405" x2="446" y2="405" marker-end="url(#a)"/>
+  <text x="300" y="398" text-anchor="middle" font-size="12"><tspan font-weight="600" class="tc">POST #2</tspan> same prefix + 2 tool_result</text>
+  <line class="ln" x1="450" y1="445" x2="154" y2="445" marker-end="url(#a)"/>
+  <text x="300" y="438" text-anchor="middle" font-size="12">tool_use synthesis (prompt = both JSON)</text>
+
+  <line class="dash" x1="150" y1="480" x2="746" y2="480" marker-end="url(#am)"/>
+  <text x="600" y="473" text-anchor="middle" font-size="12" class="ts">start synthesis</text>
+  <line class="ln" x1="750" y1="515" x2="454" y2="515" marker-end="url(#a)"/>
+  <text x="600" y="509" text-anchor="middle" font-size="12">synthesis POST (no tools)</text>
+  <line class="ln" x1="450" y1="540" x2="746" y2="540" marker-end="url(#a)"/>
+  <text x="600" y="556" text-anchor="middle" font-size="11" class="mut">text: JSON report · end_turn</text>
+  <line class="dash" x1="750" y1="580" x2="154" y2="580" marker-end="url(#am)"/>
+  <text x="450" y="573" text-anchor="middle" font-size="12" class="ts">→ 1 tool_result block</text>
+
+  <!-- POST 3 -->
+  <line class="ln" x1="150" y1="620" x2="446" y2="620" marker-end="url(#a)"/>
+  <text x="300" y="613" text-anchor="middle" font-size="12"><tspan font-weight="600" class="tc">POST #3</tspan> same prefix + tool_result</text>
+  <line class="ln" x1="450" y1="660" x2="154" y2="660" marker-end="url(#a)"/>
+  <text x="300" y="653" text-anchor="middle" font-size="12">text: final answer</text>
+  <text x="300" y="675" text-anchor="middle" font-size="11" class="mut mono">stop_reason: "end_turn"</text>
+</svg>
+</div>
+
+<h2><span class="n">2</span>How the agent data goes to the model</h2>
+<ul class="rules">
+<li>The agent list is text in the <code>description</code> of the <code>Agent</code> tool, in <code>tools[]</code>.</li>
+<li>Each agent gives 3 items: name, description, tool names.</li>
+<li>The subagent system prompt (<code>AgentDefinition.prompt</code>) stays on the client. The coordinator model does not see it.</li>
+<li>The client sends the full <code>system</code> and <code>tools[]</code> again in each coordinator POST. The prompt cache makes this cheap. It does not make it absent.</li>
+</ul>
+
+<div class="fig">
+<svg viewBox="0 0 900 430" role="img" aria-label="Request body of POST 1 and which agent fields go into it">
+  <defs>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <!-- request body -->
+  <rect class="ba" x="20" y="14" width="520" height="400" rx="10"/>
+  <text x="36" y="40" font-weight="600" class="ta">POST #1 body</text>
+  <text x="200" y="40" font-size="11" class="mut mono">req_011CgC47KkWoft6VPHApPTm9</text>
+
+  <rect class="bn" x="36" y="54" width="488" height="30" rx="5"/>
+  <text x="48" y="74" class="mono" font-size="12">"model": "claude-sonnet-5-5"</text>
+
+  <rect class="bn" x="36" y="92" width="488" height="40" rx="5"/>
+  <text x="48" y="110" class="mono" font-size="12">"system": COORDINATOR_PROMPT</text>
+  <text x="48" y="125" font-size="11" class="mut">"emit TWO Agent tool calls in a SINGLE response…"</text>
+
+  <rect class="bn" x="36" y="140" width="488" height="214" rx="5"/>
+  <text x="48" y="160" class="mono" font-size="12">"tools": [</text>
+  <rect class="bc" x="56" y="168" width="456" height="152" rx="5"/>
+  <text x="68" y="186" class="mono" font-size="12">{ "name": "Agent",</text>
+  <text x="80" y="204" class="mono" font-size="12">"description": "… Available agent types:</text>
+  <text x="96" y="222" class="mono" font-size="11">- web-search: Searches the web… (Tools: WebSearch, WebFetch)</text>
+  <text x="96" y="238" class="mono" font-size="11">- doc-analysis: Analyses local documents… (Tools: Read, Grep, Glob)</text>
+  <text x="96" y="254" class="mono" font-size="11">- synthesis: Combines… Use only after… (Tools: none)</text>
+  <text x="96" y="270" class="mono" font-size="11" fill-opacity=".7">- Explore, general-purpose, Plan, claude, statusline-setup"</text>
+  <text x="80" y="292" class="mono" font-size="12">"input_schema": { subagent_type, description,</text>
+  <text x="80" y="308" class="mono" font-size="12">                  prompt, run_in_background } }</text>
+  <text x="68" y="340" class="mono" font-size="12">{ "name": "Bash" } … 26 more tools ]</text>
+
+  <rect class="bn" x="36" y="362" width="488" height="40" rx="5"/>
+  <text x="48" y="380" class="mono" font-size="12">"messages": [ { "role": "user",</text>
+  <text x="48" y="395" class="mono" font-size="11">  "content": "Research the following topic…" } ]</text>
+
+  <!-- agent definition (client) -->
+  <rect class="bs" x="600" y="140" width="280" height="190" rx="10"/>
+  <text x="616" y="164" font-weight="600" class="ts">AgentDefinition "web-search"</text>
+  <text x="616" y="180" font-size="11" class="mut">stays in client memory</text>
+  <rect class="bn" x="616" y="192" width="248" height="32" rx="5"/>
+  <text x="628" y="213" class="mono" font-size="12">key → name</text>
+  <rect class="bn" x="616" y="230" width="248" height="32" rx="5"/>
+  <text x="628" y="251" class="mono" font-size="12">description</text>
+  <rect class="bn" x="616" y="268" width="248" height="32" rx="5"/>
+  <text x="628" y="289" class="mono" font-size="12">tools</text>
+  <rect class="bw" x="616" y="306" width="248" height="18" rx="4"/>
+  <text x="628" y="319" class="mono tw" font-size="11">prompt — NOT SENT to coordinator</text>
+
+  <path class="ln" d="M616,208 C570,208 560,222 516,222" marker-end="url(#b)"/>
+  <path class="ln" d="M616,246 C575,246 570,224 516,226" marker-end="url(#b)"/>
+  <path class="ln" d="M616,284 C580,284 570,228 516,230" marker-end="url(#b)"/>
+  <text x="740" y="360" text-anchor="middle" font-size="12">3 fields go into one line</text>
+  <text x="740" y="376" text-anchor="middle" font-size="12">of the Agent tool text</text>
+</svg>
+</div>
+<p><b>Log evidence.</b> POST #1 shows <code>input_tokens: 2</code> and <code>cache_creation_input_tokens: 33344</code>. The fixed prefix (system, tools, agent list) is about 33k tokens.</p>
+
+<h2><span class="n">3</span>How the model tells which subagents to use</h2>
+<ul class="rules">
+<li>The model writes <code>tool_use</code> blocks. Each block names one agent in <code>input.subagent_type</code>.</li>
+<li>No router on the server selects the agent. The model generates the name as tokens. It uses the agent list, the system prompt and the task.</li>
+<li>Two <code>tool_use</code> blocks in one response mean "run in parallel".</li>
+<li><code>stop_reason: "tool_use"</code> tells the client to do the work and send a new request.</li>
+</ul>
+
+<div class="fig">
+<svg viewBox="0 0 900 330" role="img" aria-label="Response 1 content blocks">
+  <defs>
+    <marker id="c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <rect class="ba" x="20" y="14" width="560" height="300" rx="10"/>
+  <text x="36" y="40" font-weight="600" class="ta">Response #1 (SSE stream)</text>
+  <text x="250" y="40" font-size="11" class="mut mono">msg_011CgC47L76wE3VJUkMVi7Rk</text>
+
+  <rect class="bn" x="36" y="54" width="528" height="42" rx="5"/>
+  <text x="48" y="72" class="mono" font-size="12">[0] { "type": "thinking", "signature": "CAQS7BMK…" }</text>
+  <text x="48" y="88" font-size="11" class="mut">client must send this back unchanged in POST #2</text>
+
+  <rect class="bc" x="36" y="104" width="528" height="64" rx="5"/>
+  <text x="48" y="122" class="mono" font-size="12">[1] { "type": "tool_use", "id": "toolu_01GXu2…", "name": "Agent",</text>
+  <text x="68" y="140" class="mono" font-size="12">"input": { <tspan font-weight="700">"subagent_type": "web-search"</tspan>,</text>
+  <text x="80" y="158" class="mono" font-size="12">"prompt": "Topic: Eastern Redbud…" } }</text>
+
+  <rect class="bc" x="36" y="176" width="528" height="64" rx="5"/>
+  <text x="48" y="194" class="mono" font-size="12">[2] { "type": "tool_use", "id": "toolu_01W2jf…", "name": "Agent",</text>
+  <text x="68" y="212" class="mono" font-size="12">"input": { <tspan font-weight="700">"subagent_type": "doc-analysis"</tspan>,</text>
+  <text x="80" y="230" class="mono" font-size="12">"prompt": "Topic: wholesale supplier catalogs…" } }</text>
+
+  <rect class="bn" x="36" y="248" width="528" height="30" rx="5"/>
+  <text x="48" y="268" class="mono" font-size="12">"stop_reason": "tool_use"</text>
+  <text x="36" y="300" font-size="11" class="mut">One HTTP response. Same request_id req_011CgC47KkWoft6VPHApPTm9 on all blocks.</text>
+
+  <!-- decision inputs -->
+  <rect class="bn" x="630" y="54" width="250" height="186" rx="10"/>
+  <text x="646" y="78" font-weight="600">Model inputs for the choice</text>
+  <text x="646" y="104" font-size="12">• task: "catalogs in documents/"</text>
+  <text x="660" y="120" font-size="12" class="mut">→ doc-analysis description</text>
+  <text x="646" y="144" font-size="12">• task: "published web sources"</text>
+  <text x="660" y="160" font-size="12" class="mut">→ web-search description</text>
+  <text x="646" y="184" font-size="12">• system: "TWO calls, SINGLE</text>
+  <text x="660" y="200" font-size="12">response"</text>
+  <text x="646" y="224" font-size="12">• synthesis: "Use only after…"</text>
+  <path class="ln" d="M630,140 C600,140 590,140 566,140" marker-end="url(#c)"/>
+  <path class="ln" d="M630,200 C600,200 590,210 566,210" marker-end="url(#c)"/>
+</svg>
+</div>
+
+<h2><span class="n">4</span>How the client starts the subagents</h2>
+<ul class="rules">
+<li>For each <code>tool_use</code> block, the client starts a new and separate POST loop.</li>
+<li>The client builds the subagent body from 2 sources: the <code>AgentDefinition</code> and the <code>tool_use.input</code>.</li>
+<li>The subagent does not get the coordinator history. It gets only the <code>input.prompt</code> string.</li>
+<li>The subagent loops until <code>end_turn</code>. Its last text is its result.</li>
+</ul>
+
+<div class="fig">
+<svg viewBox="0 0 900 400" role="img" aria-label="Mapping from tool_use and AgentDefinition to the subagent request body">
+  <defs>
+    <marker id="d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <!-- sources -->
+  <rect class="bc" x="20" y="20" width="270" height="120" rx="10"/>
+  <text x="36" y="44" font-weight="600" class="tc">tool_use (from response #1)</text>
+  <text x="36" y="70" class="mono" font-size="12">subagent_type: "doc-analysis"</text>
+  <text x="36" y="94" class="mono" font-size="12">prompt: "Topic: wholesale…"</text>
+  <text x="36" y="118" class="mono" font-size="12">id: toolu_01W2jf…</text>
+
+  <rect class="bs" x="20" y="170" width="270" height="140" rx="10"/>
+  <text x="36" y="194" font-weight="600" class="ts">AgentDefinition (client)</text>
+  <text x="36" y="220" class="mono" font-size="12">prompt: "You are a document</text>
+  <text x="36" y="236" class="mono" font-size="12">  analysis specialist…"</text>
+  <text x="36" y="262" class="mono" font-size="12">tools: [Read, Grep, Glob]</text>
+  <text x="36" y="288" class="mono" font-size="12">model: (not set → inherit)</text>
+
+  <!-- subagent body -->
+  <rect class="ba" x="420" y="20" width="460" height="290" rx="10"/>
+  <text x="436" y="44" font-weight="600" class="ta">Subagent POST body (first call)</text>
+  <rect class="bn" x="436" y="58" width="428" height="34" rx="5"/>
+  <text x="448" y="80" class="mono" font-size="12">"model": "claude-sonnet-5-5"</text>
+  <rect class="bn" x="436" y="100" width="428" height="34" rx="5"/>
+  <text x="448" y="122" class="mono" font-size="12">"system": definition.prompt</text>
+  <rect class="bn" x="436" y="142" width="428" height="34" rx="5"/>
+  <text x="448" y="164" class="mono" font-size="12">"tools": [ Read, Grep, Glob ]</text>
+  <rect class="bn" x="436" y="184" width="428" height="50" rx="5"/>
+  <text x="448" y="204" class="mono" font-size="12">"messages": [ { "role": "user",</text>
+  <text x="448" y="222" class="mono" font-size="12">   "content": tool_use.input.prompt } ]</text>
+  <text x="436" y="262" font-size="12">No coordinator system prompt. No coordinator history.</text>
+  <text x="436" y="282" font-size="11" class="mut">Log: parent_tool_use_id toolu_01W2jf…, cache_creation 7877,</text>
+  <text x="436" y="297" font-size="11" class="mut">first output = tool_use Glob</text>
+
+  <path class="ln" d="M290,94 C360,94 360,205 432,205" marker-end="url(#d)"/>
+  <path class="ln" d="M290,228 C360,228 360,118 432,118" marker-end="url(#d)"/>
+  <path class="ln" d="M290,262 C360,262 360,160 432,160" marker-end="url(#d)"/>
+  <path class="ln" d="M290,288 C370,288 370,76 432,76" marker-end="url(#d)"/>
+
+  <!-- loop -->
+  <rect class="bs" x="420" y="332" width="460" height="56" rx="10"/>
+  <text x="436" y="354" font-size="12" font-weight="600" class="ts">Loop</text>
+  <text x="436" y="374" font-size="12">POST → tool_use Read → client reads file → POST + tool_result → … → end_turn</text>
+</svg>
+</div>
+<p>The first subagent POST has a 7,877-token prefix. The coordinator POST has 33,344. The system prompt and tools are different, so the prefix is different.</p>
+
+<h2><span class="n">5</span>How the coordinator gets the results</h2>
+<ul class="rules">
+<li>The client puts the final text of each subagent in a <code>tool_result</code> block.</li>
+<li>Each <code>tool_result.tool_use_id</code> is the same as the <code>tool_use.id</code> of its request. This is how the model links a result to its call.</li>
+<li>Both results go in one <code>user</code> message, in POST #2.</li>
+<li>The client sends the full history again: task, the response #1 blocks, and the results.</li>
+<li>The model can use a result only when the result is in <code>messages[]</code>. Thus synthesis comes in response #2, not before.</li>
+</ul>
+
+<div class="fig">
+<svg viewBox="0 0 900 420" role="img" aria-label="Growth of the messages array across the three coordinator requests">
+  <defs>
+    <marker id="e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <!-- column headers -->
+  <text x="110" y="28" text-anchor="middle" font-weight="600" class="tc">POST #1 messages[]</text>
+  <text x="400" y="28" text-anchor="middle" font-weight="600" class="tc">POST #2 messages[]</text>
+  <text x="730" y="28" text-anchor="middle" font-weight="600" class="tc">POST #3 messages[]</text>
+
+  <!-- shared prefix band -->
+  <rect class="ba" x="20" y="40" width="860" height="30" rx="5"/>
+  <text x="450" y="60" text-anchor="middle" font-size="12">system + tools[] — same bytes in all 3 → cache read 33,344 tokens in #2 and #3</text>
+
+  <!-- col1 -->
+  <rect class="bn" x="30" y="84" width="160" height="36" rx="5"/>
+  <text x="40" y="107" font-size="12">user: task</text>
+
+  <!-- col2 -->
+  <rect class="bn" x="290" y="84" width="220" height="36" rx="5"/>
+  <text x="300" y="107" font-size="12">user: task</text>
+  <rect class="bc" x="290" y="128" width="220" height="74" rx="5"/>
+  <text x="300" y="148" font-size="12">assistant:</text>
+  <text x="310" y="166" class="mono" font-size="11">thinking + signature</text>
+  <text x="310" y="180" class="mono" font-size="11">tool_use id=toolu_01GXu2…</text>
+  <text x="310" y="194" class="mono" font-size="11">tool_use id=toolu_01W2jf…</text>
+  <rect class="bs" x="290" y="210" width="220" height="74" rx="5"/>
+  <text x="300" y="230" font-size="12">user:</text>
+  <text x="310" y="248" class="mono" font-size="11">tool_result toolu_01GXu2…</text>
+  <text x="310" y="262" class="mono" font-size="11">  (web-search JSON)</text>
+  <text x="310" y="276" class="mono" font-size="11">tool_result toolu_01W2jf…</text>
+  <path class="dash" d="M512,180 C540,180 540,248 512,248"/>
+  <path class="dash" d="M512,194 C556,194 556,276 512,276"/>
+  <text x="560" y="230" font-size="10" class="mut">id match</text>
+
+  <!-- col3 -->
+  <rect class="bn" x="620" y="84" width="220" height="36" rx="5"/>
+  <text x="630" y="107" font-size="12">user: task</text>
+  <rect class="bn" x="620" y="128" width="220" height="30" rx="5"/>
+  <text x="630" y="148" font-size="12">assistant: 2 × tool_use</text>
+  <rect class="bn" x="620" y="166" width="220" height="30" rx="5"/>
+  <text x="630" y="186" font-size="12">user: 2 × tool_result</text>
+  <rect class="bc" x="620" y="204" width="220" height="44" rx="5"/>
+  <text x="630" y="222" font-size="12">assistant:</text>
+  <text x="640" y="238" class="mono" font-size="11">tool_use synthesis</text>
+  <rect class="bs" x="620" y="256" width="220" height="44" rx="5"/>
+  <text x="630" y="274" font-size="12">user:</text>
+  <text x="640" y="290" class="mono" font-size="11">tool_result (report JSON)</text>
+
+  <!-- responses -->
+  <rect class="ba" x="30" y="320" width="160" height="80" rx="8"/>
+  <text x="40" y="340" font-size="12" font-weight="600">Response #1</text>
+  <text x="40" y="358" font-size="11">2 × tool_use</text>
+  <text x="40" y="374" class="mono" font-size="11">stop: tool_use</text>
+  <rect class="ba" x="290" y="320" width="220" height="80" rx="8"/>
+  <text x="300" y="340" font-size="12" font-weight="600">Response #2</text>
+  <text x="300" y="358" font-size="11">1 × tool_use synthesis</text>
+  <text x="300" y="374" class="mono" font-size="11">stop: tool_use</text>
+  <text x="300" y="390" font-size="10" class="mut">cache_read 33,344 · new 12,775</text>
+  <rect class="ba" x="620" y="320" width="220" height="80" rx="8"/>
+  <text x="630" y="340" font-size="12" font-weight="600">Response #3</text>
+  <text x="630" y="358" font-size="11">text: final answer</text>
+  <text x="630" y="374" class="mono" font-size="11">stop: end_turn</text>
+
+  <path class="ln" d="M190,360 C240,360 240,150 286,150" marker-end="url(#e)"/>
+  <path class="ln" d="M510,360 C570,360 570,226 616,226" marker-end="url(#e)"/>
+  <text x="232" y="300" font-size="10" class="mut">echo back</text>
+  <text x="575" y="320" font-size="10" class="mut">echo back</text>
+</svg>
+</div>
+
+<h2><span class="n">6</span>Evidence from the log</h2>
+<div class="tw">
+<table>
+<tr><th>What</th><th>Log value</th><th>Where</th></tr>
+<tr><td>Total model calls</td><td>14 distinct <code>request_id</code>: 3 coordinator, 11 subagent</td><td>all assistant records</td></tr>
+<tr><td>Agents known to the session</td><td><code>claude, doc-analysis, Explore, general-purpose, Plan, statusline-setup, synthesis, web-search</code></td><td>stream[16] init</td></tr>
+<tr><td>POST #1</td><td><code>req_011CgC47KkWoft6VPHApPTm9</code>, cache_creation 33,344</td><td>stream[22–24]</td></tr>
+<tr><td>Parallel calls</td><td>2 <code>tool_use</code>, same <code>msg_011CgC47L76wE3VJUkMVi7Rk</code></td><td>stream[23], stream[24]</td></tr>
+<tr><td>Subagent request</td><td><code>parent_tool_use_id: toolu_01W2jf…</code>, cache_creation 7,877</td><td>line 941</td></tr>
+<tr><td>Subagent times</td><td>web-search 76.8 s · doc-analysis 123.0 s · synthesis 144.7 s</td><td>trace lines</td></tr>
+<tr><td>POST #2</td><td><code>req_011CgC4HN5wscaUTFjKz6gx7</code>, cache_read 33,344, new 12,775</td><td>stream[126]</td></tr>
+<tr><td>POST #3</td><td><code>req_011CgC4XmHbLLp3p1hdqz7ur</code>, <code>stop_reason: "end_turn"</code></td><td>end of log</td></tr>
+</table>
+</div>
+
+<h2><span class="n">7</span>Limits of this page</h2>
+<ul class="rules">
+<li>The log does not show the raw HTTP bodies. The CLI sends them and does not give them to the SDK stream.</li>
+<li>Claude Code can put the agent list in the Agent tool <code>description</code> or in a system reminder. This log cannot show which one version 2.1.303 uses.</li>
+<li>To record the real bodies, set <code>ANTHROPIC_BASE_URL</code> to a local logging proxy.</li>
+</ul>
+
+</main>
+</body>
+</html>

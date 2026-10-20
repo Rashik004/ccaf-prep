@@ -8,7 +8,7 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import { webSearchAgent, docAnalysisAgent, synthesisAgent } from "./agents";
 import { parseResearchResult } from "./parse";
 import { verifyAttribution, verifyParallelResearch } from "./verify";
-import { loadAnthropicModel } from "../../../env";
+import { loadAnthropicModel } from "../../../common/env";
 import {
   logAgentCall,
   logAgentResult,
