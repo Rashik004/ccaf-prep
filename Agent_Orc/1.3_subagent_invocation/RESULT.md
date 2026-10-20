@@ -12,7 +12,28 @@ npm start -- "Using the catalogs in documents/, compare wholesale prices, sizes 
 
 Log: `Log/20261019-221746_run.log` (1.07 MB, 145 stream messages). Report: `output/20261019-221746_report.md`.
 
-## 2. What happened
+## 2. Cost
+
+Taken from the latest successful run, `Log/20261020-001706_run.log` (same prompt, 2026-10-20 00:17 local). The trace below is from the earlier run `20261019-221746`, which cost $1.1488.
+
+| | |
+|---|---|
+| Total | **$1.5080** (`total_cost_usd: 1.5079582`), 414.7 s, 4 coordinator turns |
+| Model calls | 1 coordinator session + 3 subagents (`web-search`, `doc-analysis`, `synthesis`), all on `claude-sonnet-5-5` |
+| `claude-sonnet-5-5` | $1.4610: 32 input, 85,425 output (18,601 thinking), 391,231 cache read, 227,030 cache write tokens |
+| `claude-haiku-5-5` | $0.0469: 53,556 input, 3,181 output tokens, 4 web search requests (the SDK's internal WebSearch helper, not one of our agents) |
+
+Per subagent, from each `task_notification` (the SDK reports tokens, not USD, per subagent):
+
+| Subagent | Total tokens | Tool uses | Duration |
+|---|---|---|---|
+| `web-search` | 20,797 | 9 | 73.1 s |
+| `doc-analysis` | 130,317 | 17 | 122.6 s |
+| `synthesis` | 42,462 | 1 | 143.9 s |
+
+`doc-analysis` dominates because it reads all ten catalogs into its context.
+
+## 3. What happened
 
 The coordinator announced the plan, then put two Agent calls in one assistant message:
 
@@ -80,7 +101,7 @@ Usage from the `result` message: 25,018 output tokens (1,504 of them thinking), 
    [05_evergreen-horizons-nursery_catalog.pdf, p.1; 10_heritage-hills-wholesale_catalog.pdf, p.1]
 ```
 
-## 3. Acceptance behaviours
+## 4. Acceptance behaviours
 
 | Behaviour | Showed up | Evidence |
 |---|---|---|
@@ -90,7 +111,7 @@ Usage from the `result` message: 25,018 output tokens (1,504 of them thinking), 
 | Every statement in the report is attributed to a source a researcher actually returned, with page numbers for documents | Yes | `verifyAttribution` passed (0 issues); saved report cites `<file>.pdf, p.N` for each document claim. |
 | Each subagent is scoped to the tools its job needs | Partly observed | Defined in code (`web-search`: WebSearch, WebFetch; `doc-analysis`: Read, Grep, Glob; `synthesis`: none). The log prints the coordinator's tool list but not each subagent's, so the scoping is asserted by the definition, not by the trace. See section 5. |
 
-## 4. Study points
+## 5. Study points
 
 - **A subagent is a definition, not a class.** It is an `AgentDefinition` keyed by name under the coordinator's `agents` option: `description` (routing information the coordinator reads to decide who to call), `prompt` (the subagent's system prompt), `tools` (least privilege), optional `model`. The coordinator invokes it through the `Agent` tool with `subagent_type` set to that name. The exam guide calls this tool `Task`.
 - **Context passing means the call prompt is the whole context.** The subagent does not see the coordinator's conversation. Whatever it needs (topic, scope, where to look, what to leave out) is written into the prompt by the coordinator. What it must not see (the other agent's work, an output schema that would override its own) is left out.
@@ -103,7 +124,7 @@ Usage from the `result` message: 25,018 output tokens (1,504 of them thinking), 
 - **Things the lesson did not say, the log did.** The SDK session inherits the user-level Claude Code configuration: 15 `hook_started` / `hook_response` messages fired before the first model turn, from this machine's `SessionStart` hooks. The coordinator's tool list in the init message also exposed every built-in tool, even though `allowedTools` restricted it to `Agent`; the restriction is enforced at call time, not in the advertised list.
 - **Contrast with neighbours.** 1.2 names the pattern (coordinator fan-out and synthesis); 1.3 is the mechanics of one hop: what goes into the prompt, what comes back and how. 1.6 is about how the coordinator chose to split by source type in the first place.
 
-## 5. Open questions and next tries
+## 6. Open questions and next tries
 
 - Does the log show each subagent's tool list anywhere (the `task_started` message, or the subagent's own `init`)? Grep the stream records for `tools` under `parent_tool_use_id`.
 - Can the SDK session be told to ignore user-level settings and hooks, so the trace starts at the first model turn? Check the `settingSources` option.
