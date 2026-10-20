@@ -1,6 +1,6 @@
 # Agent harness todo
 
-Claude Code hooks, skills, agents and path rules to build for this repo. Each item names the exam task it doubles as practice for, so building the harness is itself study time for Domain 3 (Claude Code configuration) and task 1.5 (hooks).
+Claude Code hooks, skills and agents to build for this repo. Each item names the exam task it doubles as practice for, so building the harness is itself study time for Domain 3 (Claude Code configuration) and task 1.5 (hooks).
 
 Scope note: these are **Claude Code** hooks that shape how Claude works *on* this repo. The Agent SDK hooks that exercises for task 1.5 implement live inside those exercises, not here.
 
@@ -29,16 +29,12 @@ Built: `curriculum-status`, `task-id-context`, `protect-generated-paths`, `run-e
 | P1 | `SessionStart` | | `curriculum-status` | Prints counts of done / in progress / todo tasks and the next three todo IDs from `docs/curriculum.md`. Warns when neither `.env` nor the terminal holds a usable `ANTHROPIC_API_KEY` (same lookup as `common/env.ts`). | Orients every session without re-reading the map; catches a dead key before an API call. |
 | P1 | `UserPromptSubmit` | | `task-id-context` | When the prompt contains a task ID (`1.4`, `3.2`), injects that row from the curriculum: title, lesson URL, folder, status. | Makes the lesson page the reference point automatically, per `CLAUDE.md`. |
 | P1 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `protect-generated-paths` | Denies writes under an exercise's `Log/` or `output/`, any `node_modules/`, and to `.env`, `.env.*` (except `.env.example`) or `package-lock.json`. Windows aliases (`/f/`, `\\?\`, `\\?\UNC\`, `\\<any host>\F$`, `::$DATA`) resolve to the same check. Bash-tool writes are not covered. | Logs are evidence; they are read, never hand-edited. |
-| P1 | `PreToolUse` | `Bash` | `git-guard` | Blocks `git add -A` / `git add .` when the working tree contains unignored `Log/`, `output/` or `.env` paths; blocks commit messages carrying a Claude attribution trailer. | Keeps generated files and attribution out of history, matching the user-level rule. |
-| P1 | `PostToolUse` | `Write\|Edit` | `typecheck-on-save` | For a `.ts` file, runs `tsc --noEmit` in the nearest folder with a `package.json` and returns errors as feedback. | Breakage surfaces at the edit, not at the run that costs API money. |
 | P2 | `PostToolUse`, `PostToolUseFailure` | `Bash\|PowerShell` | `run-evidence` | After a command containing `npm start`, finds the newest `Log/` file in that folder and prints its path, size, model, token totals and duration, then reminds that `RESULT.md` needs updating. Built in step 5. A command hook cannot dispatch an agent, so it parses the log itself; `/run-exercise` does the `log-analyst` pass. | Closes the loop from run to write-up; the summary line is what `RESULT.md` section 1 needs. |
 | P2 | `Stop` | | `exercise-completeness` | If files under an exercise folder changed (uncommitted changes in `git status` stand in for "this session"), checks that `README.md` and `RESULT.md` exist with the required section headings and that the curriculum row is not `todo`. Blocks the stop once with the missing items; honours `stop_hook_active` so it cannot loop. **To do:** also require `Gist_<id>.html` and `Log_data_flow_<id>.html` (exercise 1.3 exempt), with tests. | Enforces the definition of done in `CLAUDE.md`. |
 | P2 | `PreToolUse` | `Write\|Edit` | `exercise-folder-naming` | When a write creates a new top-level exercise folder, checks it matches `<Domain>/<d.n>_<snake_title>` and that the ID exists in the curriculum. | Layout stays navigable; task IDs stay the shared vocabulary. |
-| P2 | `PreCompact` | | `checkpoint-exercise` | Writes a short state note (task ID, acceptance behaviours, what is done, next step) to the scratchpad so it survives compaction. | Big logs eat context; compaction mid-exercise otherwise loses the acceptance list. |
-| P3 | `SubagentStop` | | `subagent-report-shape` | For the repo's own agents, checks the returned text contains the agent's required headings (see Agents) and asks for a rerun when one is missing. | Keeps agent handbacks machine-usable by the skills that call them. Practice for task 5.3. |
-| P3 | `PreToolUse` | `WebFetch` | `allowed-sources` | Allows the study site and Anthropic docs without a prompt; asks for anything else. | Fewer permission prompts on the two sources every exercise uses. |
+| P3 | `PreToolUse` | `WebFetch` | `allowed-sources` | Not a hook script: `permissions.allow` entries in `.claude/settings.json` (`WebFetch(domain:claudecertificationguide.com)`, `WebFetch(domain:docs.claude.com)`, `WebFetch(domain:docs.anthropic.com)`) let the study site and Anthropic docs through without a prompt; everything else keeps the default ask. | Fewer permission prompts on the two sources every exercise uses. A permission rule does this with no code, so a hook would only duplicate it. |
 
-Exam practice: hooks as a whole cover task 1.5 (hook lifecycle, blocking vs advisory, exit codes and JSON output) and task 3.6 (`typecheck-on-save` is CI in miniature).
+Exam practice: hooks as a whole cover task 1.5 (hook lifecycle, blocking vs advisory, exit codes and JSON output).
 
 ## Skills
 
@@ -55,7 +51,6 @@ Each is a folder `.claude/skills/<name>/SKILL.md`, invoked as `/<name>`.
 | P2 | `study-notes` | task ID | Fetches the lesson and relevant Anthropic docs, writes RESULT sections 4 and 5: study points in the user's framing, contrasts with neighbouring tasks, open questions. Appends five drill questions to `docs/drills/<id>.md`. | 4.1, 5.5 |
 | P2 | `exercise-review` | task ID | Dispatches `exercise-reviewer`; prints findings as file:line with the `CLAUDE.md` rule each one breaks. | 4.6, 3.5 |
 | P2 | `progress` | | Rebuilds the status column in `docs/curriculum.md` from folder state (code present, README, RESULT, at least one log) and prints a domain-weighted completion percentage. | 3.1 |
-| P3 | `lesson` | task ID | Fetches one lesson page and returns a tight summary in chat. Read-only, no files written. | 5.4 |
 | P3 | `drill` | task ID or domain | Quizzes from the study points in RESULT files and `docs/drills/`, grades the answers, lists weak spots. | 4.2 |
 
 ## Agents
@@ -72,28 +67,10 @@ Each is a file `.claude/agents/<name>.md`. Agents exist to keep bulky reads out 
 
 The built-in `claude-code-guide` agent already covers Claude Code, Agent SDK and API questions. Reach for it instead of writing an equivalent.
 
-## Path rules
-
-Files under `.claude/rules/`, each scoped by a path pattern. Practice for task 3.3. These let `CLAUDE.md` shrink over time: a rule that only matters when editing one kind of file moves out of the always-loaded file.
-
-- [ ] `common/**`: generic helpers only, no lesson vocabulary, every export documented with one line.
-- [ ] `**/src/**/*.ts`: every model call and tool call goes through the shared logger; the entry file reads arguments and prints the result, nothing else.
-- [ ] `**/README.md`: the five required sections in order.
-- [ ] `**/RESULT.md`: the six required sections in order; log excerpts are quoted, not paraphrased.
-- [ ] `docs/**`: task IDs link to their curriculum row.
-
-## Permissions
-
-In `.claude/settings.json`, allow without prompting:
-
-- [ ] `npm install`, `npm start`, `npm run typecheck`, `npx tsc --noEmit`
-- [ ] WebFetch for `claudecertificationguide.com`, `docs.claude.com`, `docs.anthropic.com`, `github.com/anthropics`
-- [ ] Read access to `Log/**` and `output/**`
-
 ## Suggested build order
 
 1. Prerequisites, so the conventions the hooks check actually hold.
-2. ~~`curriculum-status`, `task-id-context`, `protect-generated-paths`~~ (built), `git-guard`, `typecheck-on-save`.
+2. ~~`curriculum-status`, `task-id-context`, `protect-generated-paths`~~ (built).
 3. ~~`log-analyst` agent, then `log-analysis` skill. Validate on the existing 1.3 logs.~~ (built)
 4. ~~`lesson-researcher` agent, then `new-exercise` skill.~~ (built; use it to start 1.1)
 5. ~~`run-exercise`, `run-evidence` hook, `exercise-completeness` hook.~~ (built)
