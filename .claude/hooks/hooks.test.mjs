@@ -3,20 +3,24 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { readTasks } from "./lib/curriculum.mjs";
+import { readDomainWeights, readTasks } from "./lib/curriculum.mjs";
+import { RESULT_SECTIONS } from "./lib/exercise.mjs";
 import { PROJECT_ROOT } from "./lib/hook-io.mjs";
+import { progressMismatches, weightedProgress } from "./lib/progress.mjs";
 import { canonical, protectionReason } from "./lib/protected-paths.mjs";
 import { keyWarning, statusText } from "./lib/status.mjs";
 import { MAX_IDS, findTaskIds, taskContext } from "./lib/task-ids.mjs";
 
 const HOOKS = fileURLToPath(new URL(".", import.meta.url));
 // A fixed curriculum, so progress in docs/curriculum.md never turns these tests red.
-const tasks = readTasks(join(HOOKS, "fixtures", "curriculum.md"));
+const FIXTURE = join(HOOKS, "fixtures", "curriculum.md");
+const tasks = readTasks(FIXTURE);
+const TEMPLATES = join(PROJECT_ROOT, ".claude", "skills", "new-exercise", "templates");
 const windows = process.platform === "win32";
 
 /** Runs a hook script as Claude Code does: event JSON on stdin, answer on stdout. */
@@ -102,6 +106,61 @@ describe("curriculum-status", () => {
     const r = runHook("curriculum-status.mjs", "not json");
     assert.equal(r.code, 0, r.stderr);
     assert.match(r.json.hookSpecificOutput.additionalContext, /^Curriculum/);
+  });
+});
+
+describe("progress", () => {
+  const roots = [];
+  after(() => roots.forEach((r) => rmSync(r, { recursive: true, force: true })));
+  const scratch = () => {
+    const root = mkdtempSync(join(tmpdir(), "ccaf-progress-"));
+    roots.push(root);
+    return root;
+  };
+
+  test("reads domain weights, CRLF too", () => {
+    assert.deepEqual([...readDomainWeights(FIXTURE)], [["1", 27], ["2", 18], ["4", 20]]);
+    const crlf = join(scratch(), "crlf.md");
+    writeFileSync(crlf, readFileSync(FIXTURE, "utf8").replace(/\r?\n/g, "\r\n"));
+    assert.deepEqual([...readDomainWeights(crlf)], [["1", 27], ["2", 18], ["4", 20]]);
+  });
+  test("weights done tasks per domain and skips unweighted domains", () => {
+    assert.equal(weightedProgress(tasks, readDomainWeights(FIXTURE)), "Weighted progress: 9.0% (D1 1/3, D2 0/2, D4 0/1)");
+  });
+  test("says so when there are no weights", () => {
+    assert.equal(weightedProgress(tasks, new Map()), "Weighted progress: no domain weights found in docs/curriculum.md");
+  });
+  test("lists rows whose status disagrees with the folder", () => {
+    const root = scratch();
+    const gamma = join(root, "Agent_Orc", "1.3_gamma");
+    mkdirSync(gamma, { recursive: true });
+    writeFileSync(join(gamma, "README.md"), readFileSync(join(TEMPLATES, "README.md")));
+    writeFileSync(join(gamma, "RESULT.md"), readFileSync(join(TEMPLATES, "RESULT.md")));
+    mkdirSync(join(root, "Tool_MCP", "2.1_delta"), { recursive: true });
+    const lines = progressMismatches(tasks, root);
+    assert.equal(lines.length, 3, lines.join("\n"));
+    assert.equal(lines[0], '1.2 is "in progress" but its folder Agent_Orc/1.2_beta is missing');
+    assert.ok(lines[1].startsWith('1.3 is "done" but: '), lines[1]);
+    assert.ok(lines[1].includes('RESULT.md: section "Run" is empty'), lines[1]);
+    assert.ok(!lines[1].includes("Gist_"), lines[1]);
+    assert.equal(lines[2], '2.1 is "todo" but folder Tool_MCP/2.1_delta exists');
+  });
+  test("flags an in-progress exercise that looks done, and a row without a folder", () => {
+    const root = scratch();
+    const ex = join(root, "Tool_MCP", "2.2_eps");
+    mkdirSync(ex, { recursive: true });
+    writeFileSync(join(ex, "README.md"), readFileSync(join(TEMPLATES, "README.md")));
+    writeFileSync(join(ex, "RESULT.md"), RESULT_SECTIONS.map((s) => `## ${s}\ntext\n`).join(""));
+    writeFileSync(join(ex, "Gist_2.2.html"), "x");
+    writeFileSync(join(ex, "Log_data_flow_2.2.html"), "x");
+    const rows = [
+      { id: "2.2", title: "E", folder: "Tool_MCP/2.2_eps", status: "in progress" },
+      { id: "2.3", title: "F", folder: "", status: "done" },
+    ];
+    assert.deepEqual(progressMismatches(rows, root), [
+      '2.2 is "in progress" but looks done: set it to done after you read the write-ups',
+      '2.3 is "done" but has no folder in docs/curriculum.md',
+    ]);
   });
 });
 
