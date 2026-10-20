@@ -1,11 +1,12 @@
 // protected-paths.mjs — decides whether a file write touches a generated path
 
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
+import { DOMAIN_DIRS } from "./exercise.mjs";
 
 // Run logs are the evidence RESULT.md quotes; output/ is what the program writes.
 // Both sit directly in an exercise folder: <domain>/<task-id>_<title>/Log/.
 const EXERCISE_DIRS = ["log", "output"];
-const DOMAIN_DIRS = ["agent_orc", "tool_mcp", "cc_config", "prompt_eng", "context_mgmt"];
+const DOMAINS = DOMAIN_DIRS.map((d) => d.toLowerCase());
 // npm regenerates node_modules/ wherever it sits.
 const ANY_DEPTH_DIRS = ["node_modules"];
 // package-lock.json changes only through npm.
@@ -49,7 +50,7 @@ export function protectionReason(filePath, root, cwd = root) {
     return `${rel} is under node_modules/, which npm generates. Change package.json instead.`;
   }
   // segments[0] is the domain folder, segments[1] the exercise, segments[2] its Log/ or output/.
-  if (segments.length >= 3 && DOMAIN_DIRS.includes(segments[0]) && EXERCISE_DIRS.includes(segments[2])) {
+  if (segments.length >= 3 && DOMAINS.includes(segments[0]) && EXERCISE_DIRS.includes(segments[2])) {
     return segments[2] === "log"
       ? `${rel} is a run log. Logs are evidence: read them, never edit them.`
       : `${rel} is program output. Change the code that writes it instead.`;
