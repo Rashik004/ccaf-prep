@@ -81,6 +81,19 @@ const CD = new RegExp(
   "gi"
 );
 
+const LOG_OVERRIDE = new RegExp(String.raw`(?:^|[\s;&|(])(?:\$env:)?RUN_LOG_FILE\s*=\s*(${ARG})`);
+
+/**
+ * The RUN_LOG_FILE that common/log.ts writes to instead of <exercise>/Log: set in the
+ * command (RUN_LOG_FILE=x npm start, export, or $env:RUN_LOG_FILE = 'x'), else inherited
+ * from the environment Claude Code passes to both the shell and this hook. Undefined when unset.
+ */
+export function logOverride(command, env = process.env) {
+  const set = LOG_OVERRIDE.exec(command)?.[1];
+  const value = set === undefined ? env.RUN_LOG_FILE : set.replace(/^(["'])(.*)\1$/, "$2");
+  return value || undefined;
+}
+
 /**
  * Where the command ran npm start: its --prefix, else the cd chain before it, applied to
  * `cwd`. `root` replaces $CLAUDE_PROJECT_DIR in the command.

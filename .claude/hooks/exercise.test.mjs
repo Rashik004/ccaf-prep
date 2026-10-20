@@ -19,7 +19,7 @@ import {
   sectionProblems,
 } from "./lib/exercise.mjs";
 import { PROJECT_ROOT } from "./lib/hook-io.mjs";
-import { NPM_START, lastRecord, runDir, summariseLog } from "./lib/run-log.mjs";
+import { NPM_START, lastRecord, logOverride, runDir, summariseLog } from "./lib/run-log.mjs";
 
 const HOOKS = fileURLToPath(new URL(".", import.meta.url));
 const TEMPLATES = join(PROJECT_ROOT, ".claude", "skills", "new-exercise", "templates");
@@ -140,11 +140,22 @@ describe("npm start detection", () => {
     assert.equal(runDir("cd a; cd ../b && npm start -- x", cwd, PROJECT_ROOT), join(cwd, "b"));
     assert.equal(runDir("npm --prefix ../Agent_Orc/1.3_x start", cwd, PROJECT_ROOT), ex);
     assert.equal(runDir("npm start --prefix ../Agent_Orc/1.3_x", cwd, PROJECT_ROOT), ex);
-    assert.equal(runDir("Set-Location ..\\Tool_MCP\\2.1_x; npm start", cwd, PROJECT_ROOT), join(PROJECT_ROOT, "Tool_MCP", "2.1_x"));
+    // Backslash separators are a Windows path only; POSIX reads them as file name characters.
+    if (process.platform === "win32") {
+      assert.equal(runDir("Set-Location ..\\Tool_MCP\\2.1_x; npm start", cwd, PROJECT_ROOT), join(PROJECT_ROOT, "Tool_MCP", "2.1_x"));
+    }
     assert.equal(runDir("Set-Location -Path ../Agent_Orc/1.3_x; npm start", cwd, PROJECT_ROOT), ex);
     assert.equal(runDir("Push-Location ../Agent_Orc/1.3_x; npm start", cwd, PROJECT_ROOT), ex);
     assert.equal(runDir('cd "$CLAUDE_PROJECT_DIR/Agent_Orc/1.3_x" && npm start', cwd, PROJECT_ROOT), ex);
     assert.equal(runDir("echo cd x; npm start", cwd, PROJECT_ROOT), cwd);
+  });
+  test("logOverride reads RUN_LOG_FILE from the command, else the environment", () => {
+    assert.equal(logOverride("RUN_LOG_FILE=out/a.log npm start", {}), "out/a.log");
+    assert.equal(logOverride("export RUN_LOG_FILE='/tmp/a b.log' && npm start", {}), "/tmp/a b.log");
+    assert.equal(logOverride('$env:RUN_LOG_FILE = "C:\\t\\a.log"; npm start', {}), "C:\\t\\a.log");
+    assert.equal(logOverride("npm start", { RUN_LOG_FILE: "e.log" }), "e.log");
+    assert.equal(logOverride("npm start", {}), undefined);
+    assert.equal(logOverride("npm start", { RUN_LOG_FILE: "" }), undefined);
   });
   test("summariseLog skips malformed per-model usage", () => {
     const dir = mkdtempSync(join(tmpdir(), "ccaf-log-"));
@@ -186,7 +197,7 @@ function runIn(root, script, event) {
   const res = spawnSync(process.execPath, [join(HOOKS, script)], {
     input: JSON.stringify(event),
     encoding: "utf8",
-    env: { ...process.env, CCAF_HOOK_ROOT: root },
+    env: { ...process.env, CCAF_HOOK_ROOT: root, RUN_LOG_FILE: "" },
   });
   return { code: res.status, stdout: res.stdout, stderr: res.stderr, json: res.stdout ? JSON.parse(res.stdout) : undefined };
 }
@@ -239,6 +250,19 @@ describe("hooks end to end", () => {
       assert.match(r.json.hookSpecificOutput.additionalContext, /9\.8_other/);
     } finally {
       rmSync(other, { recursive: true, force: true });
+    }
+  });
+  test("run-evidence: reads the RUN_LOG_FILE log, not the newest in Log/", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ccaf-override-"));
+    try {
+      const f = join(dir, "override.log");
+      writeFileSync(f, readFileSync(FIXTURE_LOG));
+      const r = runIn(repo.root, "run-evidence.mjs", { tool_input: { command: `RUN_LOG_FILE="${f}" npm start` }, cwd: repo.wip });
+      assert.match(r.json.hookSpecificOutput.additionalContext, /Run log: .*override\.log/);
+      const missing = runIn(repo.root, "run-evidence.mjs", { tool_input: { command: `RUN_LOG_FILE="${join(dir, "none.log")}" npm start` }, cwd: repo.wip });
+      assert.match(missing.json.hookSpecificOutput.additionalContext, /RUN_LOG_FILE points at .*none\.log/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
   test("run-evidence: background runs get a reminder, not a summary", () => {

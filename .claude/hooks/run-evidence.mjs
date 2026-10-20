@@ -3,10 +3,18 @@
 // at RESULT.md, so the run and its write-up stay one step apart. A failed run (non-zero exit)
 // arrives as PostToolUseFailure, and its log matters most. Advisory only: it never blocks.
 
-import { join } from "node:path";
+import { existsSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { exerciseFolderFor, newestLog } from "./lib/exercise.mjs";
 import { PROJECT_ROOT, addContext, readEvent, runHook } from "./lib/hook-io.mjs";
-import { NPM_START, runDir, summariseLog } from "./lib/run-log.mjs";
+import { NPM_START, logOverride, runDir, summariseLog } from "./lib/run-log.mjs";
+
+/** The log at `path` in newestLog's shape, or undefined when there is no file. */
+function logAt(path) {
+  if (!existsSync(path)) return undefined;
+  const stat = statSync(path);
+  return stat.isFile() ? { path, mtimeMs: stat.mtimeMs, size: stat.size } : undefined;
+}
 
 // Slack between the run's start (now minus its duration) and the log's first write.
 const SLACK_MS = 5000;
@@ -37,8 +45,11 @@ runHook("run-evidence", () => {
 
   const lines = [];
   if (eventName === "PostToolUseFailure") lines.push("run-evidence: the run exited with an error. Its log says why.");
-  const log = newestLog(folder);
-  if (!log) lines.push(`run-evidence: ${folder} has no Log/*.log. The run wrote no log; check that the entry point opens the run log.`);
+  // npm start runs in the exercise folder, so a relative RUN_LOG_FILE resolves from there.
+  const override = logOverride(command);
+  const log = override ? logAt(resolve(folder, override)) : newestLog(folder);
+  if (!log && override) lines.push(`run-evidence: RUN_LOG_FILE points at ${resolve(folder, override)}, which does not exist. The run wrote no log there.`);
+  else if (!log) lines.push(`run-evidence: ${folder} has no Log/*.log. The run wrote no log; check that the entry point opens the run log.`);
   else {
     const window = typeof event.duration_ms === "number" ? event.duration_ms + SLACK_MS : FALLBACK_MS;
     if (Date.now() - log.mtimeMs > window) {

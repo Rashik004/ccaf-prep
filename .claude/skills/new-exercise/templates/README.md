@@ -14,7 +14,7 @@ Setup, API key and logging: see the [root README](../../README.md).
 
 ```sh
 npm install
-npm start -- "{{PROMPT}}"
+npm start -- '{{PROMPT}}'
 ```
 
 Test inputs: {{INPUTS}}

@@ -57,7 +57,7 @@ Copy every file from [`templates/`](templates/) into the folder, keeping the pat
 | `{{PACKAGE}}` | package.json | `ccaf-` + the folder name with `.` and `_` as `-`, e.g. `ccaf-1-1-agentic-loops` |
 | `{{SUMMARY}}` | README | one paragraph: what the lesson teaches and what this program shows |
 | `{{BEHAVIOURS}}` | README | the approved list, one numbered line per step: `1. **<step in a few words>.** <behaviour>` |
-| `{{PROMPT}}` | README | the approved example prompt, with any `"` inside it escaped |
+| `{{PROMPT}}` | README | the approved example prompt. The template wraps it in single quotes, so the shell expands nothing inside (`$HOME`, `$(...)`, backticks and backslashes stay literal); write each `'` inside it as `'\''` |
 | `{{INPUTS}}` | README | the approved test inputs and the expected result, or "None beyond the prompt." |
 
 Search the folder for `{{`. It is finished when no placeholder is left. Keep every `##` heading of the README and RESULT templates word for word, because the `exercise-completeness` hook checks for them. The README's What to watch for and Troubleshooting sections get their content after the first run.
