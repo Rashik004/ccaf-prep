@@ -1,0 +1,16 @@
+{
+  "name": "{{PACKAGE}}",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CCA-F task {{ID}}: {{TITLE}}",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

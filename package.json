@@ -2,10 +2,10 @@
   "name": "ccaf-prep",
   "version": "1.0.0",
   "private": true,
-  "description": "Study exercises for the Claude Certified Architect (Foundations) exam. Each exercise is its own package; this root only tests common/.",
+  "description": "Study exercises for the Claude Certified Architect (Foundations) exam. Each exercise is its own package; this root only tests common/ and the Claude Code hooks in .claude/hooks/.",
   "type": "module",
   "scripts": {
-    "test": "tsx --test \"common/*.test.ts\"",
+    "test": "tsx --test \"common/*.test.ts\" \".claude/hooks/*.test.mjs\"",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

@@ -16,21 +16,23 @@ The hooks below assume the conventions in `CLAUDE.md`. Done on 2026-10-20:
 - [x] Write `RESULT.md` for exercise 1.3 from its latest log, then mark it `done` in `docs/curriculum.md`.
 - [x] Remove the stray `log.txt` committed at the repo root.
 
-Still open before the `exercise-completeness` hook can pass on 1.3: its `README.md` predates `CLAUDE.md` and does not yet follow the five-section order.
+The 1.3 README and RESULT now have every section `exercise-completeness` checks for (its test suite asserts this).
 
 ## Hooks
 
-Configured in `.claude/settings.json`. Scripts live in `.claude/hooks/`.
+Configured in `.claude/settings.json`. Scripts live in `.claude/hooks/`, plain Node.js `.mjs` with no dependencies; tests in `.claude/hooks/hooks.test.mjs` run with `npm test`.
+
+Built: `curriculum-status`, `task-id-context`, `protect-generated-paths`, `run-evidence`, `exercise-completeness`.
 
 | P | Event | Matcher | Name | What it does | Why |
 |---|---|---|---|---|---|
-| P1 | `SessionStart` | | `curriculum-status` | Prints counts of done / in progress / todo tasks and the next three todo IDs from `docs/curriculum.md`. Warns when `.env` is missing or still holds the placeholder key. | Orients every session without re-reading the map; catches a dead key before an API call. |
+| P1 | `SessionStart` | | `curriculum-status` | Prints counts of done / in progress / todo tasks and the next three todo IDs from `docs/curriculum.md`. Warns when neither `.env` nor the terminal holds a usable `ANTHROPIC_API_KEY` (same lookup as `common/env.ts`). | Orients every session without re-reading the map; catches a dead key before an API call. |
 | P1 | `UserPromptSubmit` | | `task-id-context` | When the prompt contains a task ID (`1.4`, `3.2`), injects that row from the curriculum: title, lesson URL, folder, status. | Makes the lesson page the reference point automatically, per `CLAUDE.md`. |
-| P1 | `PreToolUse` | `Write\|Edit` | `protect-generated-paths` | Denies writes under `Log/`, `output/`, `node_modules/`, and to `.env` or `package-lock.json`. | Logs are evidence; they are read, never hand-edited. |
+| P1 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `protect-generated-paths` | Denies writes under an exercise's `Log/` or `output/`, any `node_modules/`, and to `.env`, `.env.*` (except `.env.example`) or `package-lock.json`. Windows aliases (`/f/`, `\\?\`, `\\?\UNC\`, `\\<any host>\F$`, `::$DATA`) resolve to the same check. Bash-tool writes are not covered. | Logs are evidence; they are read, never hand-edited. |
 | P1 | `PreToolUse` | `Bash` | `git-guard` | Blocks `git add -A` / `git add .` when the working tree contains unignored `Log/`, `output/` or `.env` paths; blocks commit messages carrying a Claude attribution trailer. | Keeps generated files and attribution out of history, matching the user-level rule. |
 | P1 | `PostToolUse` | `Write\|Edit` | `typecheck-on-save` | For a `.ts` file, runs `tsc --noEmit` in the nearest folder with a `package.json` and returns errors as feedback. | Breakage surfaces at the edit, not at the run that costs API money. |
-| P2 | `PostToolUse` | `Bash` | `run-evidence` | After a command containing `npm start`, finds the newest `Log/` file in that folder and prints its path, size, model, token totals and duration, then reminds that `RESULT.md` needs updating. | Closes the loop from run to write-up; the summary line is what `RESULT.md` section 1 needs. |
-| P2 | `Stop` | | `exercise-completeness` | If files under an exercise folder changed this session, checks that `README.md` and `RESULT.md` exist with the required section headings and that the curriculum row is not `todo`. Blocks the stop once with the missing items; honours `stop_hook_active` so it cannot loop. | Enforces the definition of done in `CLAUDE.md`. |
+| P2 | `PostToolUse`, `PostToolUseFailure` | `Bash\|PowerShell` | `run-evidence` | After a command containing `npm start`, finds the newest `Log/` file in that folder and prints its path, size, model, token totals and duration, then reminds that `RESULT.md` needs updating. Built in step 5. A command hook cannot dispatch an agent, so it parses the log itself; `/run-exercise` does the `log-analyst` pass. | Closes the loop from run to write-up; the summary line is what `RESULT.md` section 1 needs. |
+| P2 | `Stop` | | `exercise-completeness` | If files under an exercise folder changed (uncommitted changes in `git status` stand in for "this session"), checks that `README.md` and `RESULT.md` exist with the required section headings and that the curriculum row is not `todo`. Blocks the stop once with the missing items; honours `stop_hook_active` so it cannot loop. | Enforces the definition of done in `CLAUDE.md`. |
 | P2 | `PreToolUse` | `Write\|Edit` | `exercise-folder-naming` | When a write creates a new top-level exercise folder, checks it matches `<Domain>/<d.n>_<snake_title>` and that the ID exists in the curriculum. | Layout stays navigable; task IDs stay the shared vocabulary. |
 | P2 | `PreCompact` | | `checkpoint-exercise` | Writes a short state note (task ID, acceptance behaviours, what is done, next step) to the scratchpad so it survives compaction. | Big logs eat context; compaction mid-exercise otherwise loses the acceptance list. |
 | P3 | `SubagentStop` | | `subagent-report-shape` | For the repo's own agents, checks the returned text contains the agent's required headings (see Agents) and asks for a rerun when one is missing. | Keeps agent handbacks machine-usable by the skills that call them. Practice for task 5.3. |
@@ -45,6 +47,7 @@ Each is a folder `.claude/skills/<name>/SKILL.md`, invoked as `/<name>`.
 | P | Name | Input | What it does | Practises |
 |---|---|---|---|---|
 | P1 | `new-exercise` | task ID | Dispatches `lesson-researcher`, writes the acceptance behaviours, scaffolds the folder (package.json, tsconfig, `src/` entry wired to `common/`, README and RESULT skeletons with the required headings), sets the curriculum row to `in progress`. Ends by printing the acceptance list for review. | 3.2, 1.6 |
+| P1 | `build-exercise` | task ID | Writes `src/` against the acceptance behaviours: settles open points with the user, plans files and a behaviour-to-log-line map, writes small exercises itself and larger ones through subagents (core mechanism `opus`/high, supporting code `sonnet`/medium, data `haiku`/low), then typechecks and runs a fresh-reader readability review. Stops before any paid run. Added after step 5; not in the original plan. | 3.2, 1.6 |
 | P1 | `run-exercise` | task ID, optional args | Runs `npm start` in the folder, dispatches `log-analyst` on the newest log, fills RESULT sections 1 to 3 with quoted evidence, reports which acceptance behaviours showed up. | 4.4, 5.6 |
 | P1 | `log-analysis` | log path or task ID | Dispatches `log-analyst` and renders its summary: timeline, per-agent prompts, tool calls, handoffs, tokens, cost, anomalies. Replaces the ad-hoc HTML reports made for 1.3. | 5.1, 5.3 |
 | P2 | `study-notes` | task ID | Fetches the lesson and relevant Anthropic docs, writes RESULT sections 4 and 5: study points in the user's framing, contrasts with neighbouring tasks, open questions. Appends five drill questions to `docs/drills/<id>.md`. | 4.1, 5.5 |
@@ -59,7 +62,7 @@ Each is a file `.claude/agents/<name>.md`. Agents exist to keep bulky reads out 
 
 | P | Name | Tools | Returns (required headings) | Used by |
 |---|---|---|---|---|
-| P1 | `log-analyst` | Read, Grep, Bash (read-only) | `Run`, `Timeline`, `Prompts sent`, `Tool calls`, `Handoffs`, `Tokens and cost`, `Anomalies`, `Acceptance evidence` | `run-exercise`, `log-analysis`, `run-evidence` hook |
+| P1 | `log-analyst` | Read, Grep, Bash (read-only) | `Run`, `Timeline`, `Prompts sent`, `Tool calls`, `Handoffs`, `Tokens and cost`, `Anomalies`, `Acceptance evidence` | `run-exercise`, `log-analysis` |
 | P1 | `lesson-researcher` | WebFetch, Read | `Concepts`, `Acceptance behaviours`, `Suggested scenario`, `Anthropic doc links`, `Neighbouring tasks` | `new-exercise`, `study-notes` |
 | P2 | `exercise-reviewer` | Read, Grep, Glob | `Layout`, `Code rules`, `Logging rules`, `README`, `RESULT`, each a list of file:line findings | `exercise-review`, optionally `exercise-completeness` hook |
 | P3 | `study-note-writer` | Read, Edit (RESULT.md only) | `Study points`, `Contrasts`, `Open questions` | `study-notes` |
@@ -73,7 +76,7 @@ Files under `.claude/rules/`, each scoped by a path pattern. Practice for task 3
 - [ ] `common/**`: generic helpers only, no lesson vocabulary, every export documented with one line.
 - [ ] `**/src/**/*.ts`: every model call and tool call goes through the shared logger; the entry file reads arguments and prints the result, nothing else.
 - [ ] `**/README.md`: the five required sections in order.
-- [ ] `**/RESULT.md`: the five required sections in order; log excerpts are quoted, not paraphrased.
+- [ ] `**/RESULT.md`: the six required sections in order; log excerpts are quoted, not paraphrased.
 - [ ] `docs/**`: task IDs link to their curriculum row.
 
 ## Permissions
@@ -87,8 +90,8 @@ In `.claude/settings.json`, allow without prompting:
 ## Suggested build order
 
 1. Prerequisites, so the conventions the hooks check actually hold.
-2. `curriculum-status`, `task-id-context`, `protect-generated-paths`, `git-guard`, `typecheck-on-save`.
-3. `log-analyst` agent, then `log-analysis` skill. Validate on the five existing 1.3 logs.
-4. `lesson-researcher` agent, then `new-exercise` skill. Use it to start 1.1.
-5. `run-exercise`, `run-evidence` hook, `exercise-completeness` hook.
+2. ~~`curriculum-status`, `task-id-context`, `protect-generated-paths`~~ (built), `git-guard`, `typecheck-on-save`.
+3. ~~`log-analyst` agent, then `log-analysis` skill. Validate on the existing 1.3 logs.~~ (built)
+4. ~~`lesson-researcher` agent, then `new-exercise` skill.~~ (built; use it to start 1.1)
+5. ~~`run-exercise`, `run-evidence` hook, `exercise-completeness` hook.~~ (built)
 6. Everything P2 and P3 as the matching curriculum task comes up.
