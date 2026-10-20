@@ -7,12 +7,15 @@ import { join } from "node:path";
 import { readTasks } from "./lib/curriculum.mjs";
 import { changedExercises, completenessProblems } from "./lib/exercise.mjs";
 import { PROJECT_ROOT, readEvent, respond, runHook } from "./lib/hook-io.mjs";
+import { NPM_START } from "./lib/run-log.mjs";
 
 runHook("exercise-completeness", () => {
   const event = readEvent();
   if (event.stop_hook_active) return; // already blocked once this turn: let the stop happen
-  // A run still going in the background cannot have written its RESULT.md yet.
-  if (Array.isArray(event.background_tasks) && event.background_tasks.length) return;
+  // A run still going in the background cannot have written its RESULT.md yet. Other
+  // background tasks (subagents, monitors, unrelated shells) are no reason to skip.
+  const tasks = Array.isArray(event.background_tasks) ? event.background_tasks : [];
+  if (tasks.some((t) => t?.type === "shell" && typeof t.command === "string" && NPM_START.test(t.command))) return;
 
   const statusById = new Map(readTasks().map((t) => [t.id, t.status]));
   const report = [];

@@ -294,11 +294,21 @@ describe("hooks end to end", () => {
     assert.doesNotMatch(r.json.reason, /1\.1_done/);
   });
   test("exercise-completeness: lets the stop through on the retry or while a run is in the background", () => {
-    for (const event of [{ stop_hook_active: true }, { stop_hook_active: false, background_tasks: [{ id: "b1" }] }]) {
+    const run = { id: "b1", type: "shell", status: "running", command: "cd Agent_Orc/9.9_hook_selftest && npm start -- x" };
+    for (const event of [{ stop_hook_active: true }, { stop_hook_active: false, background_tasks: [run] }]) {
       const r = runIn(repo.root, "exercise-completeness.mjs", event);
       assert.equal(r.code, 0, r.stderr);
       assert.equal(r.stdout, "");
     }
+  });
+  test("exercise-completeness: still checks while unrelated background tasks run", () => {
+    const background_tasks = [
+      { id: "b2", type: "shell", status: "running", command: "tail -f x.log" },
+      { id: "b3", type: "subagent", status: "running", agent_type: "Explore" },
+      { id: "b4", type: "monitor", status: "running" },
+    ];
+    const r = runIn(repo.root, "exercise-completeness.mjs", { stop_hook_active: false, background_tasks });
+    assert.equal(r.json.decision, "block");
   });
   test("exercise-completeness: a deleted exercise is not unfinished work", () => {
     rmSync(repo.done, { recursive: true, force: true });
