@@ -31,7 +31,9 @@ Rules:
 `/drill` appends one line per session:
 
 ```
-<YYYY-MM-DD> | <scope: 1.3, D1 or all> | <right>/<asked> | missed: <id>#Q<n>, <id>#Q<n>
+<YYYY-MM-DD> | <scope: 1.3, D1 or all> | <right>/<asked> | asked: <id>#Q<n>, … | missed: <id>#Q<n>, …
 ```
 
-`missed: none` when every answer was right. The next `/drill` session asks the questions missed most recently first.
+`asked` lists every saved question asked in the session; `missed` the ones answered wrong, or `none`. Unsaved generated questions are counted in `<right>/<asked>` but listed in neither.
+
+A question is a **weak spot** when the latest line that lists it under `asked` also lists it under `missed`. Answering it right in a later session clears it. The next `/drill` session asks the weak spots in its scope first, most recently missed first.

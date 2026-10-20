@@ -15,7 +15,7 @@ Find the task's row in `docs/curriculum.md`: its title, lesson URL and folder. S
 Take the first that applies, and tell the user which log you chose and why:
 
 1. The log path given as the second argument.
-2. The log that RESULT.md section `## 1. Run` names (a line such as ``- Log: `Log/20261021-010626_run.log` ``). RESULT.md's cost and trace come from that run, so the page matches them. If the named file does not exist (logs are gitignored, so a fresh clone has none), say so and ask the user with AskUserQuestion: use the newest log in `Log/` instead, or stop. The totals check in step 6 will then compare two different runs.
+2. The log that RESULT.md section `## 1. Run` names (a line such as ``- Log: `Log/20261021-010626_run.log` ``). RESULT.md's cost and trace come from that run, so the page matches them. If the named file does not exist (logs are gitignored, so a fresh clone has none), say so and ask the user with AskUserQuestion: use the newest log in `Log/` instead, or stop. A fallback log is a **different run** from the one RESULT.md describes: steps 5, 6 and 7 then take nothing from RESULT.md, and the page's header summary says it shows a different run from RESULT.md.
 3. The newest `*.log` in `<folder>/Log/` by modification time.
 
 Stop if no log exists: the next step is `/run-exercise <id>`.
@@ -32,19 +32,19 @@ If `<folder>/Log_data_flow_<id>.html` exists, ask the user with AskUserQuestion:
 
 Read `CLAUDE.md`, sections "HTML write-ups, per exercise" and "Log_data_flow_<task-id>.html", then fill `.claude/skills/gist/page-shell.html` (its top comment lists the placeholders and building blocks). Header: task ID, lesson title and URL, a one-line summary of the run, and `NAV` links to `README.md`, `RESULT.md` and `Gist_<id>.html`. Then five sections, all from the agent's report:
 
-1. **The run**: log file name, date, command, model, and totals for calls, input/output tokens, cost and duration. Cost comes from the log's `result` record when there is one (Agent SDK runs); otherwise from RESULT.md section 2. Say which.
+1. **The run**: log file name, date, command, model, and totals for calls, input/output tokens, cost and duration. Cost comes from the log's `result` record when there is one (Agent SDK runs); otherwise from RESULT.md section 2 when RESULT.md cites this same log; otherwise it reads "not in log (Messages API responses report tokens, not USD)". Say which.
 2. **Sequence**: one Mermaid `sequenceDiagram` with every model call and tool call in order. Participants are the lesson's roles (coordinator, subagent, tool, API), not file names.
 3. **Call table**: number, role, model, input/output tokens, duration, stop reason.
-4. **Requests and responses**: at least one pair per distinct kind of call in `Call samples` (first turn, tool-use turn, subagent, final turn), shaped as `POST /v1/messages` JSON. Mark each one with a `reconstructed` tag and cite the log lines its values come from. A field the log does not hold appears as `"<not in log>"`. Every value comes from the samples: a gap is marked, never filled from memory or from `src/`.
+4. **Requests and responses**: at least one pair per distinct kind of call in `Call samples` (first turn, tool-use turn, subagent, final turn), shaped as `POST /v1/messages` JSON. Mark each one with a `reconstructed` tag and cite the log lines its values come from. Every value comes from the samples: a gap is marked, never filled from memory or from `src/`. How a gap is marked depends on the log's shape. A Messages API request record is the complete body the program sent, so a field absent there (such as `system`) was not sent: leave it out of the JSON. An Agent SDK log has no request body, so a field it does not hold appears as `"<not in log>"`.
 5. **Limits**: what the log does not show, from the samples' `Not in log:` lists and the agent's Anomalies.
 
 ## 6. Check
 
-When RESULT.md cites this same log, the page's call count and token totals equal those in RESULT.md section 2. Report a mismatch to the user with both numbers. Leave the page as the log says and RESULT.md as it is.
+When RESULT.md cites this same log, the page's call count and token totals equal those in RESULT.md section 2. Report a mismatch to the user with both numbers. Leave the page as the log says and RESULT.md as it is. With a fallback log (step 2), skip this check and tell the user it was skipped because the page shows a different run.
 
 ## 7. Fill an empty section 4
 
-If RESULT.md `## 4. Acceptance behaviours` has no content, draft it from the agent's `Acceptance evidence`: one line per behaviour with its verdict (SHOWN / NOT SHOWN / PARTLY) and log line. Show the draft and ask the user with AskUserQuestion: write it, or leave the section empty. Keep the heading word for word.
+Only when RESULT.md cites this same log, so that section 4 quotes the run sections 1 to 3 describe. If RESULT.md `## 4. Acceptance behaviours` has no content, draft it from the agent's `Acceptance evidence`: one line per behaviour with its verdict (SHOWN / NOT SHOWN / PARTLY) and log line. Show the draft and ask the user with AskUserQuestion: write it, or leave the section empty. Keep the heading word for word.
 
 ## 8. Report
 

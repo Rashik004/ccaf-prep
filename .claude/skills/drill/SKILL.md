@@ -15,7 +15,7 @@ From the arguments:
 
 ## 2. Build the pool
 
-Read the question files in scope (format: `docs/drills/README.md`). Then read `docs/drills/history.md` if it exists. Questions listed under `missed:` there go first, newest session first; the rest follow in random order. Take `count` questions.
+Read the question files in scope (format: `docs/drills/README.md`). Then read `docs/drills/history.md` if it exists and find the weak spots as that README defines them, keeping only the questions in scope. Weak spots go first, most recently missed first; the rest follow in random order. Take `count` questions.
 
 If the files in scope hold fewer than `count` questions, write the missing ones yourself from the `## 5. Study points` sections of the RESULT.md files in scope (the curriculum rows give the folders), in the same format, and tell the user they are new and unsaved. If there are neither questions nor study points in scope, stop: there is nothing to drill yet; `/study-notes <id>` writes the first questions.
 
@@ -33,6 +33,6 @@ After each answer, tell the user right or wrong, the right option (by its text, 
 
 ## 4. Score and record
 
-Show the score and, for each miss, its `<id>#Q<n>` and title. Then append one line to `docs/drills/history.md` in the format of `docs/drills/README.md`, creating the file with a `# Drill history` heading if needed. Unsaved generated questions do not go in the line.
+Show the score and, for each miss, its `<id>#Q<n>` and title. Then append one line to `docs/drills/history.md` in the format of `docs/drills/README.md` (with both `asked` and `missed`), creating the file with a `# Drill history` heading if needed.
 
 Done when every question has been asked and graded, the score is shown, and the history line is written.

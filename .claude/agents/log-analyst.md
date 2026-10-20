@@ -28,7 +28,7 @@ Paths are relative to the repo root: the folder that holds `CLAUDE.md`. You only
 
 Runs come in two shapes, and they record different things:
 
-- **Messages API runs** (exercise 1.1): each call is a `===== iteration N request (messages.create) =====` record holding the full request (model, system, messages, tools, params), followed by its response record (content blocks, `stop_reason`, `usage`).
+- **Messages API runs** (exercise 1.1): each call is a `===== iteration N request (messages.create) =====` record holding the full request (model, system, messages, tools, params), followed by its response record (content blocks, `stop_reason`, `usage`). The record is the whole body the program sent, so a field absent from it (such as `system`) was not sent: report it as "not sent", not under `Not in log:`.
 - **Agent SDK runs** (exercise 1.3): `stream[N]` records, an init record (`model`, `tools`, `agents`), `── Agent call ▶` blocks with subagent prompts, and a closing `type=result` record. There is no request body: the system prompt, the tools array and the per-call params are mostly absent from the log.
 
 ## Method
