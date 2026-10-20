@@ -19,7 +19,7 @@ Taken from the latest successful run, `Log/20261020-001706_run.log` (same prompt
 | | |
 |---|---|
 | Total | **$1.5080** (`total_cost_usd: 1.5079582`), 414.7 s, 4 coordinator turns |
-| Model calls | 1 coordinator session + 3 subagents (`web-search`, `doc-analysis`, `synthesis`), all on `claude-sonnet-5-5` |
+| Model calls | 14 `claude-sonnet-5-5` calls (distinct assistant `message.id` values): coordinator 3, `doc-analysis` 7, `web-search` 3, `synthesis` 1. The `claude-haiku-5-5` calls inside the SDK's WebSearch helper are not logged as messages, so their count is unknown |
 | `claude-sonnet-5-5` | $1.4610: 32 input, 85,425 output (18,601 thinking), 391,231 cache read, 227,030 cache write tokens |
 | `claude-haiku-5-5` | $0.0469: 53,556 input, 3,181 output tokens, 4 web search requests (the SDK's internal WebSearch helper, not one of our agents) |
 

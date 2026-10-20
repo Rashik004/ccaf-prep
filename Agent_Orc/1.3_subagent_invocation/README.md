@@ -34,7 +34,7 @@ Supplier catalogs in `documents/` plus web sources (the run in [RESULT.md](RESUL
 npm start -- "Using the catalogs in documents/, compare wholesale prices, sizes and availability for Eastern Redbud (Cercis canadensis) across suppliers, and compare with published web sources on its hardiness zones and landscape use."
 ```
 
-Cost of this prompt (latest successful run, `Log/20261020-001706_run.log`): **$1.51**, 414.7 s. One coordinator session plus 3 subagents on `claude-sonnet-5-5` ($1.46: 85,425 output, 391,231 cache-read and 227,030 cache-write tokens), plus $0.05 of `claude-haiku-5-5` for the SDK's web searches. See [RESULT.md](RESULT.md#2-cost) for the per-subagent breakdown.
+Cost of this prompt (latest successful run, `Log/20261020-001706_run.log`): **$1.51**, 414.7 s. 14 `claude-sonnet-5-5` model calls across the coordinator and 3 subagents ($1.46: 85,425 output, 391,231 cache-read and 227,030 cache-write tokens), plus $0.05 of `claude-haiku-5-5` for the SDK's web searches. See [RESULT.md](RESULT.md#2-cost) for the per-subagent breakdown.
 
 Web sources only:
 
