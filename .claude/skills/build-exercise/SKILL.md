@@ -98,4 +98,4 @@ Update the README's `## Source files` table: one row per file in `src/`, with th
 - the files and their roles,
 - the behaviour map: each behaviour, its log line, and its check,
 - the decisions from step 3,
-- the next step: `/run-exercise $ARGUMENTS`, which costs money for one run.
+- the next steps: `/gist $ARGUMENTS`, which needs no run, then `/run-exercise $ARGUMENTS`, which costs money for one run.
