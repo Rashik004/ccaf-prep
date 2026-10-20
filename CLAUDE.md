@@ -61,7 +61,7 @@ Written for a reader who has not seen the lesson. Focus on running this lesson's
 
 1. Task ID, lesson title, link to the lesson page, one-paragraph summary, link to the root README.
 2. What the program builds: the Build Exercise steps, each with its acceptance behaviour.
-3. Run: the exact commands, then example prompts (the one used in RESULT.md first) and any lesson-specific inputs such as sample documents.
+3. Run: the exact commands, then example prompts (the one used in RESULT.md first) and any lesson-specific inputs such as sample documents. Give the cost of running the example prompt: model, model calls, input/output tokens and USD total, taken from the RESULT.md run's log.
 4. What to watch for in the output and the log, so the reader sees the concept, not just a result.
 5. Lesson-specific troubleshooting only.
 6. Source files: a table of file and the role it plays.
@@ -71,10 +71,11 @@ Written for a reader who has not seen the lesson. Focus on running this lesson's
 Written after a successful run. This is the revision material.
 
 1. The command that was run and the date.
-2. What happened: a condensed trace with the relevant log excerpts (prompts, decisions, handoffs, tool calls). Quote the log rather than paraphrase it.
-3. Each acceptance behaviour, one line: did it show up, and the log evidence.
-4. Study points: what the exam expects you to know about this task, in your own words, plus anything the run taught that the lesson did not say. Contrast with neighbouring tasks: when to pick this pattern over that one.
-5. Open questions and things to try next.
+2. Cost of the run: model, number of model calls, input/output tokens and USD total from the log, plus a per-call breakdown when the run has more than one call (coordinator vs subagents, retries).
+3. What happened: a condensed trace with the relevant log excerpts (prompts, decisions, handoffs, tool calls). Quote the log rather than paraphrase it.
+4. Each acceptance behaviour, one line: did it show up, and the log evidence.
+5. Study points: what the exam expects you to know about this task, in your own words, plus anything the run taught that the lesson did not say. Contrast with neighbouring tasks: when to pick this pattern over that one.
+6. Open questions and things to try next.
 
 ## Git
 
