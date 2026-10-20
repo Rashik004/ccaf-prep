@@ -188,5 +188,5 @@ Rendering check: open each page in a browser (the `chrome-devtools-axi` CLI or C
 - Wording of skill steps, as long as they match the existing skills' voice.
 - Commit granularity within the `feat(harness)` / `docs(harness)` convention.
 - Whether the progress code goes in `lib/status.mjs` or a new `lib/progress.mjs`.
-- Which new skills get `disable-model-invocation` (at least the ones that write many files: `gist`, `data-flow`, `study-notes`).
+- Which new skills get `disable-model-invocation`. (Plan decision: none of the four. `disable-model-invocation` stays reserved for skills that spend money, like `run-exercise`; the new ones ask before overwriting, and validation needs Claude to invoke them.)
 - Whether 1.1's validation outputs go in `docs(1.1)` commits, separate from the `feat(harness)` ones.
