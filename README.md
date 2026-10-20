@@ -160,17 +160,33 @@ npm install
 npm test
 ```
 
-## Claude Code hooks
+## Claude Code harness
 
-`.claude/settings.json` registers hooks that shape how Claude Code works on this repo. The scripts are plain Node.js in `.claude/hooks/` and need no install. The plan for the full harness is in [`docs/agent-harness-todo.md`](docs/agent-harness-todo.md).
+`.claude/` holds the hooks, skills and agents that shape how Claude Code works on this repo.
+
+### Hooks
+
+`.claude/settings.json` registers the hooks. The scripts are plain Node.js in `.claude/hooks/` and need no install. The plan for the full harness is in [`docs/agent-harness-todo.md`](docs/agent-harness-todo.md).
 
 | Event | Hook | What it does |
 |---|---|---|
 | `SessionStart` | `curriculum-status` | Adds done / in progress / todo counts and the next three todo tasks to Claude's context. Warns when no usable `ANTHROPIC_API_KEY` is in `.env` or the terminal. |
 | `UserPromptSubmit` | `task-id-context` | When the prompt names a task ID such as `1.4`, adds that curriculum row: title, status, folder, lesson URL. |
 | `PreToolUse` (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`) | `protect-generated-paths` | Denies writes to an exercise's `Log/` or `output/`, any `node_modules/`, `.env` and `.env.*` (not `.env.example`), and `package-lock.json`. Writes through the shell are not covered. |
+| `PostToolUse` (`Bash`, `PowerShell`) | `run-evidence` | After `npm start` in an exercise folder, adds the newest run log's summary (model, tokens and cost per model, duration, outcome) and a RESULT.md reminder. Warns when the newest log is older than the run. |
+| `Stop` | `exercise-completeness` | When an exercise folder has uncommitted changes, checks that README.md and RESULT.md have their required sections in order and that the curriculum row is past `todo`. Blocks the stop once with the gaps. |
 
 `npm test` at the repo root (after `npm install` there) also runs the hook tests.
+
+### Skills and agents
+
+| Command | What it does |
+|---|---|
+| `/new-exercise <id>` | Researches the lesson (agent `lesson-researcher`), writes the acceptance behaviours, scaffolds the folder from `.claude/skills/new-exercise/templates/` and sets the task to `in progress`. Stops for your review before any code is written. |
+| `/run-exercise <id> [args]` | Runs `npm start` (this costs API money), analyses the log (agent `log-analyst`), fills RESULT.md sections 1 to 3 and reports each acceptance behaviour as shown or not shown. |
+| `/log-analysis <log path or id>` | Summarises a run log through `log-analyst`: timeline, prompts, tool calls, handoffs, tokens and cost, anomalies, acceptance evidence. Claude also reaches it on its own when you ask about a run. |
+
+The agents in `.claude/agents/` read the bulky sources (run logs, lesson pages) and return fixed headings, so the main conversation gets the evidence and not the 1 MB log.
 
 ## Troubleshooting
 
