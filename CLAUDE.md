@@ -22,6 +22,7 @@ Study repo for the Claude Certified Architect (Foundations) exam. Every exam tas
   output/         artefacts the program produces (gitignored)
 common/           shared helpers that sit outside the lessons' scope
 docs/             curriculum map, harness todo, notes that span several tasks
+  drills/         exam-style questions per task (<task-id>.md) and the quiz history
 ```
 
 Domain folders: `Agent_Orc` (1), `Tool_MCP` (2), `CC_Config` (3), `Prompt_Eng` (4), `Context_Mgmt` (5). Each exercise is its own npm package with its own `package.json`, so it runs and reads in isolation.

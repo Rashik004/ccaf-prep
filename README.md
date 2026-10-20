@@ -166,15 +166,15 @@ npm test
 
 ### Hooks
 
-`.claude/settings.json` registers the hooks. The scripts are plain Node.js in `.claude/hooks/` and need no install. The plan for the full harness is in [`docs/agent-harness-todo.md`](docs/agent-harness-todo.md).
+`.claude/settings.json` registers the hooks. The scripts are plain Node.js in `.claude/hooks/` and need no install. The harness is frozen; [`docs/agent-harness-todo.md`](docs/agent-harness-todo.md) records what was built and what was dropped.
 
 | Event | Hook | What it does |
 |---|---|---|
-| `SessionStart` | `curriculum-status` | Adds done / in progress / todo counts and the next three todo tasks to Claude's context. Warns when no usable `ANTHROPIC_API_KEY` is in `.env` or the terminal. |
+| `SessionStart` | `curriculum-status` | Adds done / in progress / todo counts, the next three todo tasks and the exam-weighted progress to Claude's context, and lists curriculum rows whose status disagrees with their folder (a `done` task with gaps, an `in progress` one that looks done, a `todo` with a folder). Report only. Warns when no usable `ANTHROPIC_API_KEY` is in `.env` or the terminal. |
 | `UserPromptSubmit` | `task-id-context` | When the prompt names a task ID such as `1.4`, adds that curriculum row: title, status, folder, lesson URL. |
 | `PreToolUse` (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`) | `protect-generated-paths` | Denies writes to an exercise's `Log/` or `output/`, any `node_modules/`, `.env` and `.env.*` (not `.env.example`), and `package-lock.json`. Writes through the shell are not covered. |
 | `PostToolUse`, `PostToolUseFailure` (`Bash`, `PowerShell`) | `run-evidence` | After `npm start` in an exercise folder, failed or not, adds the newest run log's summary (model, tokens and cost per model, duration, outcome) and a RESULT.md reminder. Warns when the newest log is older than the run. |
-| `Stop` | `exercise-completeness` | When an exercise folder has uncommitted changes, checks that README.md and RESULT.md have their required sections in order and that the curriculum row is past `todo`. Blocks the stop once with the gaps. |
+| `Stop` | `exercise-completeness` | When an exercise folder has uncommitted changes, checks that README.md and RESULT.md have their required sections in order, that no RESULT section is empty, that `Gist_<id>.html` and `Log_data_flow_<id>.html` exist (1.3 exempt), and that the curriculum row is past `todo`. Blocks the stop once with the gaps. |
 
 `npm test` at the repo root (after `npm install` there) also runs the hook tests.
 
@@ -184,7 +184,11 @@ npm test
 |---|---|
 | `/new-exercise <id>` | Researches the lesson (agent `lesson-researcher`), writes the acceptance behaviours, scaffolds the folder from `.claude/skills/new-exercise/templates/` and sets the task to `in progress`. Stops for your review before any code is written. |
 | `/build-exercise <id>` | Writes `src/` from the README's acceptance behaviours. Asks you when the spec allows more than one program, shows a plan for your approval, uses subagents (each with a set model and effort) for larger exercises, then typechecks and has a fresh reader review the code for readability. Never runs the program. |
-| `/run-exercise <id> [args]` | Runs `npm start` (this costs API money), analyses the log (agent `log-analyst`), fills RESULT.md sections 1 to 3 and reports each acceptance behaviour as shown or not shown. |
+| `/gist <id>` | Writes `Gist_<id>.html` from `src/`: a Mermaid program-flow diagram, then each important step with its `file:line` excerpt, what it does and why. Needs no run. |
+| `/run-exercise <id> [args]` | Runs `npm start` (this costs API money), analyses the log (agent `log-analyst`), fills RESULT.md sections 1 to 4 and reports each acceptance behaviour as shown or not shown. |
+| `/data-flow <id> [log]` | Writes `Log_data_flow_<id>.html` from the run RESULT.md cites: sequence diagram, call table, reconstructed request/response JSON with log line citations, limits. Offers to fill an empty RESULT section 4 without a rerun. |
+| `/study-notes <id>` | Drafts RESULT.md sections 5 and 6 (study points, open questions) for your approval and adds five exam-style questions to `docs/drills/<id>.md`. |
+| `/drill [id or domain] [count]` | Asks questions from `docs/drills/` one at a time, grades each, and records misses in `docs/drills/history.md` so the next session asks them first. |
 | `/log-analysis <log path or id>` | Summarises a run log through `log-analyst`: timeline, prompts, tool calls, handoffs, tokens and cost, anomalies, acceptance evidence. Claude also reaches it on its own when you ask about a run. |
 
 The agents in `.claude/agents/` read the bulky sources (run logs, lesson pages) and return fixed headings, so the main conversation gets the evidence and not the 1 MB log.
