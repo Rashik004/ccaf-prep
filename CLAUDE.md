@@ -1,6 +1,6 @@
 # CCAF prep
 
-Study repo for the Claude Certified Architect (Foundations) exam. Every exam task statement gets one small, runnable Node.js program that implements the lesson's **Build Exercise**, plus a README and a RESULT write-up. The program is the study aid; the write-ups are the revision notes.
+Study repo for the Claude Certified Architect (Foundations) exam. Every exam task statement gets one small, runnable Node.js program that implements the lesson's **Build Exercise**, plus four write-ups: README, RESULT, a code gist and a log data-flow page. The program is the study aid; the write-ups are the revision notes.
 
 ## Source of truth
 
@@ -16,6 +16,8 @@ Study repo for the Claude Certified Architect (Foundations) exam. Every exam tas
   src/            exercise code, entry point first
   README.md       what it demonstrates, how to run it
   RESULT.md       what happened when it ran, study points
+  Gist_<task-id>.html            code walkthrough with a program-flow diagram
+  Log_data_flow_<task-id>.html   real data flow of one run, from its log
   Log/            run logs (gitignored)
   output/         artefacts the program produces (gitignored)
 common/           shared helpers that sit outside the lessons' scope
@@ -30,7 +32,7 @@ Domain folders: `Agent_Orc` (1), `Tool_MCP` (2), `CC_Config` (3), `Prompt_Eng` (
 2. Write down each Build Exercise step with its success criterion, one sentence each. These are the exercise's **acceptance behaviours**. Done when every step has one and each is observable in the program's output or log, not merely describable.
 3. Build exactly what the Build Exercise specifies: its tools, its scenario, its step order, its test cases. Every exercise step maps to code plus a logged check. Where the exercise leaves a choice open (sample data, wording), take the smallest option that satisfies it; add nothing it does not ask for.
 4. Scaffold the folder from the layout above. Set the task to `in progress` in `docs/curriculum.md`.
-5. Write the code (rules below) and run it. The exercise is done when a run completes, the log shows every acceptance behaviour, and both write-ups exist.
+5. Write the code (rules below) and run it. The exercise is done when a run completes, the log shows every acceptance behaviour, and all four write-ups exist: README, RESULT, gist, data flow.
 6. Set the task to `done` in `docs/curriculum.md`.
 
 ## Code rules
@@ -53,7 +55,7 @@ Logs are the evidence RESULT.md is built from, so every run writes one, always t
 
 ## README.md, repo root
 
-Holds everything the exercises share, so no exercise README repeats it: prerequisites, install, the API key and model (`.env` vs terminal), running an exercise in general, logs and output (`Log/`, stderr vs stdout, logging switches), analysing logs with Claude Code, `common/`, generic troubleshooting, and the exercise index. Add a row to the index when an exercise is done.
+Holds everything the exercises share, so no exercise README repeats it: prerequisites, install, the API key and model (`.env` vs terminal), running an exercise in general, logs and output (`Log/`, stderr vs stdout, logging switches), analysing logs with Claude Code, `common/`, generic troubleshooting, and the exercise index. Add a row to the index when an exercise is done, linking its four write-ups.
 
 ## README.md, per exercise
 
@@ -76,6 +78,32 @@ Written after a successful run. This is the revision material.
 4. Each acceptance behaviour, one line: did it show up, and the log evidence.
 5. Study points: what the exam expects you to know about this task, in your own words, plus anything the run taught that the lesson did not say. Contrast with neighbouring tasks: when to pick this pattern over that one.
 6. Open questions and things to try next.
+
+## HTML write-ups, per exercise
+
+Two single-file pages in the exercise folder, named with the task ID (`Gist_1.4.html`, `Log_data_flow_1.4.html`). Shared rules:
+
+- Self-contained: inline CSS, light and dark themes, readable at phone width. Diagrams are Mermaid, loaded from a pinned-version `cdn.jsdelivr.net/npm/mermaid@<x.y.z>` script; nothing else external.
+- Header: task ID, lesson title with link, one-line summary, links to README, RESULT and the other page.
+- Committed to git, like README and RESULT.
+- Exercise 1.3 predates these pages. Its `http-flow.html` and `subagent-prompting-guide.html` stay as they are.
+
+### Gist_<task-id>.html
+
+The code view: how the program implements the lesson. Written from `src/`, so it can be written before the paid run.
+
+1. Program-flow diagram (Mermaid flowchart): entry, agents, model calls, tool calls and checks, nodes named after the files and functions in `src/`. Draw the lesson concept; leave out plumbing such as `.env` reading and logging.
+2. Important steps, in program-flow order. Each: a short source excerpt with `file:line`, what it does, and why it is there in lesson terms. Done when every acceptance behaviour maps to at least one step.
+
+### Log_data_flow_<task-id>.html
+
+The wire view: what actually travelled between program, model and tools in one run. Built from the run RESULT.md cites, so the numbers match. Get the facts through the `log-analyst` agent; the log stays out of the main context.
+
+1. The run: log file name, date, command, model, totals for calls, tokens, cost and duration.
+2. Sequence diagram (Mermaid `sequenceDiagram`) of every model call and tool call in order, participants named after the lesson's roles (coordinator, subagent, tool, API).
+3. Call table: number, role, model, input/output tokens, duration, stop reason.
+4. Example request and response: at least one pair per distinct kind of call (first turn, tool-use turn, subagent, final turn), shaped as Messages API `POST /v1/messages` JSON. Logs record fields, not raw HTTP, so the bodies are reconstructed: mark each one *reconstructed* and cite the log line numbers its values come from.
+5. Limits: what the log does not show.
 
 ## Git
 
