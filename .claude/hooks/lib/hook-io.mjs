@@ -3,8 +3,11 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-/** Repo root, two levels above .claude/hooks/lib/, whatever the hook's cwd. */
-export const PROJECT_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+/**
+ * Repo root, two levels above .claude/hooks/lib/, whatever the hook's cwd.
+ * CCAF_HOOK_ROOT overrides it so the tests can run a hook against a scratch repo.
+ */
+export const PROJECT_ROOT = process.env.CCAF_HOOK_ROOT || fileURLToPath(new URL("../../../", import.meta.url));
 
 /** Reads the JSON event Claude Code writes to the hook's stdin. Returns {} for empty input. */
 export function readEvent() {
@@ -20,7 +23,7 @@ export function respond(output) {
   process.stdout.write(JSON.stringify(output));
 }
 
-/** Adds text to Claude's context. Valid for SessionStart and UserPromptSubmit. */
+/** Adds text to Claude's context. Valid for SessionStart, UserPromptSubmit, PostToolUse and PostToolUseFailure. */
 export function addContext(hookEventName, text) {
   respond({ hookSpecificOutput: { hookEventName, additionalContext: text } });
 }

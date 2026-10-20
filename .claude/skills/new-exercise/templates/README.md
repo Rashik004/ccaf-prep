@@ -14,8 +14,10 @@ Setup, API key and logging: see the [root README](../../README.md).
 
 ```sh
 npm install
-npm start -- "<example prompt>"
+npm start -- "{{PROMPT}}"
 ```
+
+Test inputs: {{INPUTS}}
 
 Cost of the example prompt: (from the RESULT.md run's log).
 

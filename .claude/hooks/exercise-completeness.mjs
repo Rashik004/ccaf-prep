@@ -11,6 +11,8 @@ import { PROJECT_ROOT, readEvent, respond, runHook } from "./lib/hook-io.mjs";
 runHook("exercise-completeness", () => {
   const event = readEvent();
   if (event.stop_hook_active) return; // already blocked once this turn: let the stop happen
+  // A run still going in the background cannot have written its RESULT.md yet.
+  if (Array.isArray(event.background_tasks) && event.background_tasks.length) return;
 
   const statusById = new Map(readTasks().map((t) => [t.id, t.status]));
   const report = [];
@@ -25,6 +27,6 @@ runHook("exercise-completeness", () => {
     reason:
       "exercise-completeness: changed exercise folders are not done per CLAUDE.md.\n" +
       `${report.join("\n")}\n` +
-      "Finish these, or tell the user what is left and why. This check blocks only once per turn.",
+      "Tell the user, in one short list, what is left. Start no exercise run (runs cost money) and write no file the user did not ask for. This check blocks only once per turn.",
   });
 });

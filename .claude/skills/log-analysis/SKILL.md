@@ -22,7 +22,7 @@ Read the `## What it builds` section of `<folder>/README.md`. Each behaviour the
 
 Give the agent the log path and the acceptance behaviours, numbered as in the README. Its report has eight headings: `Run`, `Timeline`, `Prompts sent`, `Tool calls`, `Handoffs`, `Tokens and cost`, `Anomalies`, `Acceptance evidence`.
 
-Check that all eight are present. If any is missing, send the agent the names of the missing headings and ask it to complete the report.
+Check that all eight are present. If any is missing, dispatch the agent again with its previous report and the names of the missing headings.
 
 ## 4. Render
 

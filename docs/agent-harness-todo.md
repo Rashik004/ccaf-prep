@@ -16,7 +16,7 @@ The hooks below assume the conventions in `CLAUDE.md`. Done on 2026-10-20:
 - [x] Write `RESULT.md` for exercise 1.3 from its latest log, then mark it `done` in `docs/curriculum.md`.
 - [x] Remove the stray `log.txt` committed at the repo root.
 
-Still open before the `exercise-completeness` hook can pass on 1.3: its `README.md` predates `CLAUDE.md` and does not yet follow the five-section order.
+The 1.3 README and RESULT now have every section `exercise-completeness` checks for (its test suite asserts this).
 
 ## Hooks
 
@@ -31,7 +31,7 @@ Built: `curriculum-status`, `task-id-context`, `protect-generated-paths`, `run-e
 | P1 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `protect-generated-paths` | Denies writes under an exercise's `Log/` or `output/`, any `node_modules/`, and to `.env`, `.env.*` (except `.env.example`) or `package-lock.json`. Windows aliases (`/f/`, `\\?\`, `\\?\UNC\`, `\\<any host>\F$`, `::$DATA`) resolve to the same check. Bash-tool writes are not covered. | Logs are evidence; they are read, never hand-edited. |
 | P1 | `PreToolUse` | `Bash` | `git-guard` | Blocks `git add -A` / `git add .` when the working tree contains unignored `Log/`, `output/` or `.env` paths; blocks commit messages carrying a Claude attribution trailer. | Keeps generated files and attribution out of history, matching the user-level rule. |
 | P1 | `PostToolUse` | `Write\|Edit` | `typecheck-on-save` | For a `.ts` file, runs `tsc --noEmit` in the nearest folder with a `package.json` and returns errors as feedback. | Breakage surfaces at the edit, not at the run that costs API money. |
-| P2 | `PostToolUse` | `Bash\|PowerShell` | `run-evidence` | After a command containing `npm start`, finds the newest `Log/` file in that folder and prints its path, size, model, token totals and duration, then reminds that `RESULT.md` needs updating. Built in step 5. A command hook cannot dispatch an agent, so it parses the log itself; `/run-exercise` does the `log-analyst` pass. | Closes the loop from run to write-up; the summary line is what `RESULT.md` section 1 needs. |
+| P2 | `PostToolUse`, `PostToolUseFailure` | `Bash\|PowerShell` | `run-evidence` | After a command containing `npm start`, finds the newest `Log/` file in that folder and prints its path, size, model, token totals and duration, then reminds that `RESULT.md` needs updating. Built in step 5. A command hook cannot dispatch an agent, so it parses the log itself; `/run-exercise` does the `log-analyst` pass. | Closes the loop from run to write-up; the summary line is what `RESULT.md` section 1 needs. |
 | P2 | `Stop` | | `exercise-completeness` | If files under an exercise folder changed (uncommitted changes in `git status` stand in for "this session"), checks that `README.md` and `RESULT.md` exist with the required section headings and that the curriculum row is not `todo`. Blocks the stop once with the missing items; honours `stop_hook_active` so it cannot loop. | Enforces the definition of done in `CLAUDE.md`. |
 | P2 | `PreToolUse` | `Write\|Edit` | `exercise-folder-naming` | When a write creates a new top-level exercise folder, checks it matches `<Domain>/<d.n>_<snake_title>` and that the ID exists in the curriculum. | Layout stays navigable; task IDs stay the shared vocabulary. |
 | P2 | `PreCompact` | | `checkpoint-exercise` | Writes a short state note (task ID, acceptance behaviours, what is done, next step) to the scratchpad so it survives compaction. | Big logs eat context; compaction mid-exercise otherwise loses the acceptance list. |
@@ -75,7 +75,7 @@ Files under `.claude/rules/`, each scoped by a path pattern. Practice for task 3
 - [ ] `common/**`: generic helpers only, no lesson vocabulary, every export documented with one line.
 - [ ] `**/src/**/*.ts`: every model call and tool call goes through the shared logger; the entry file reads arguments and prints the result, nothing else.
 - [ ] `**/README.md`: the five required sections in order.
-- [ ] `**/RESULT.md`: the five required sections in order; log excerpts are quoted, not paraphrased.
+- [ ] `**/RESULT.md`: the six required sections in order; log excerpts are quoted, not paraphrased.
 - [ ] `docs/**`: task IDs link to their curriculum row.
 
 ## Permissions

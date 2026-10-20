@@ -1,8 +1,8 @@
 // exercise.test.mjs — tests for run-evidence and exercise-completeness: library logic, then
-// each hook end to end against a scratch exercise folder created inside the repo
+// each hook end to end against a scratch git repository (CCAF_HOOK_ROOT), never the real repo
 
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,10 +25,6 @@ const HOOKS = fileURLToPath(new URL(".", import.meta.url));
 const TEMPLATES = join(PROJECT_ROOT, ".claude", "skills", "new-exercise", "templates");
 const FIXTURE_LOG = join(HOOKS, "fixtures", "run.log");
 
-function runHook(script, event) {
-  const res = spawnSync(process.execPath, [join(HOOKS, script)], { input: JSON.stringify(event), encoding: "utf8" });
-  return { code: res.status, stdout: res.stdout, stderr: res.stderr, json: res.stdout ? JSON.parse(res.stdout) : undefined };
-}
 
 describe("exercise folders", () => {
   test("recognises <domain>/<id>_<title>/ paths only", () => {
@@ -117,36 +113,95 @@ describe("run logs", () => {
 
 describe("npm start detection", () => {
   test("matches the forms an exercise run takes", () => {
-    for (const c of ["npm start", 'npm start -- "topic"', "npm run start", "npm --prefix x start", "cd a && npm.cmd start"]) {
+    for (const c of [
+      "npm start",
+      'npm start -- "topic"',
+      "npm run start",
+      "npm --prefix x start",
+      "npm -w foo start",
+      "cd a && npm.cmd start",
+      "npm start>out.txt",
+      "(cd X && npm start)",
+      "npm start 2>&1 | tail",
+    ]) {
       assert.ok(NPM_START.test(c), c);
     }
-    for (const c of ["npm install", "npm test", "npm run typecheck", "echo restart", "npm i start-server"]) {
+    for (const c of ["npm install", "npm test", "npm run typecheck", "echo restart", "npm i start-server", "echo npm start", "git commit -m 'npm start fix'"]) {
       assert.ok(!NPM_START.test(c), c);
     }
   });
   test("finds the run directory from --prefix, cd, or the cwd", () => {
     const cwd = join(PROJECT_ROOT, "docs");
-    assert.equal(runDir("npm start", cwd), cwd);
-    assert.equal(runDir('cd "../Agent_Orc/1.3_x" && npm start', cwd), join(PROJECT_ROOT, "Agent_Orc", "1.3_x"));
-    assert.equal(runDir("cd a; cd ../b && npm start -- x", cwd), join(cwd, "b"));
-    assert.equal(runDir("npm --prefix ../Agent_Orc/1.3_x start", cwd), join(PROJECT_ROOT, "Agent_Orc", "1.3_x"));
-    assert.equal(runDir("Set-Location ..\\Tool_MCP\\2.1_x; npm start", cwd), join(PROJECT_ROOT, "Tool_MCP", "2.1_x"));
+    const ex = join(PROJECT_ROOT, "Agent_Orc", "1.3_x");
+    assert.equal(runDir("npm start", cwd, PROJECT_ROOT), cwd);
+    assert.equal(runDir('cd "../Agent_Orc/1.3_x" && npm start', cwd, PROJECT_ROOT), ex);
+    assert.equal(runDir("cd a; cd ../b && npm start -- x", cwd, PROJECT_ROOT), join(cwd, "b"));
+    assert.equal(runDir("npm --prefix ../Agent_Orc/1.3_x start", cwd, PROJECT_ROOT), ex);
+    assert.equal(runDir("npm start --prefix ../Agent_Orc/1.3_x", cwd, PROJECT_ROOT), ex);
+    assert.equal(runDir("Set-Location ..\\Tool_MCP\\2.1_x; npm start", cwd, PROJECT_ROOT), join(PROJECT_ROOT, "Tool_MCP", "2.1_x"));
+    assert.equal(runDir("Set-Location -Path ../Agent_Orc/1.3_x; npm start", cwd, PROJECT_ROOT), ex);
+    assert.equal(runDir("Push-Location ../Agent_Orc/1.3_x; npm start", cwd, PROJECT_ROOT), ex);
+    assert.equal(runDir('cd "$CLAUDE_PROJECT_DIR/Agent_Orc/1.3_x" && npm start', cwd, PROJECT_ROOT), ex);
+    assert.equal(runDir("echo cd x; npm start", cwd, PROJECT_ROOT), cwd);
+  });
+  test("summariseLog skips malformed per-model usage", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ccaf-log-"));
+    try {
+      const f = join(dir, "x.log");
+      writeFileSync(f, '===== stream[1] type=result =====\n{\n  "modelUsage": { "a": null, "b": "x" }\n}\n');
+      assert.match(summariseLog(f, 9).join("\n"), /Totals: \?/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
-// A scratch exercise inside the repo, so both hooks see it through PROJECT_ROOT and git.
-const SCRATCH = join(PROJECT_ROOT, "Agent_Orc", "9.9_hook_selftest");
+/**
+ * A scratch git repository with the hooks' view of a repo: a curriculum with one row,
+ * a committed complete exercise, and an uncommitted incomplete one. The hooks run against
+ * it through CCAF_HOOK_ROOT, so the real repo is never touched.
+ */
+function scratchRepo() {
+  const root = mkdtempSync(join(tmpdir(), "ccaf-repo-"));
+  const git = (...args) => execFileSync("git", args, { cwd: root, stdio: "ignore" });
+  mkdirSync(join(root, "docs"));
+  writeFileSync(join(root, "docs", "curriculum.md"), "| 1.1 | Done one | https://x | `Agent_Orc/1.1_done` | done |\n");
+  const done = join(root, "Agent_Orc", "1.1_done");
+  mkdirSync(done, { recursive: true });
+  writeFileSync(join(done, "README.md"), readFileSync(join(TEMPLATES, "README.md")));
+  writeFileSync(join(done, "RESULT.md"), readFileSync(join(TEMPLATES, "RESULT.md")));
+  git("init", "-q");
+  git("add", ".");
+  git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init");
+  const wip = join(root, "Agent_Orc", "9.9_hook_selftest");
+  mkdirSync(join(wip, "Log"), { recursive: true });
+  writeFileSync(join(wip, "README.md"), "# 9.9\n## What it builds\n## Run\n");
+  writeFileSync(join(wip, "Log", "20261020-120000_run.log"), readFileSync(FIXTURE_LOG));
+  return { root, wip, done, git };
+}
+
+function runIn(root, script, event) {
+  const res = spawnSync(process.execPath, [join(HOOKS, script)], {
+    input: JSON.stringify(event),
+    encoding: "utf8",
+    env: { ...process.env, CCAF_HOOK_ROOT: root },
+  });
+  return { code: res.status, stdout: res.stdout, stderr: res.stderr, json: res.stdout ? JSON.parse(res.stdout) : undefined };
+}
 
 describe("hooks end to end", () => {
-  before(() => {
-    mkdirSync(join(SCRATCH, "Log"), { recursive: true });
-    writeFileSync(join(SCRATCH, "README.md"), "# 9.9\n## What it builds\n## Run\n");
-    writeFileSync(join(SCRATCH, "Log", "20261020-120000_run.log"), readFileSync(FIXTURE_LOG));
-  });
-  after(() => rmSync(SCRATCH, { recursive: true, force: true }));
+  let repo;
+  before(() => (repo = scratchRepo()));
+  after(() => rmSync(repo.root, { recursive: true, force: true }));
 
   test("run-evidence: summarises the fresh log after npm start", () => {
-    const r = runHook("run-evidence.mjs", { tool_name: "Bash", tool_input: { command: 'npm start -- "x"' }, cwd: SCRATCH });
+    const r = runIn(repo.root, "run-evidence.mjs", {
+      hook_event_name: "PostToolUse",
+      tool_name: "Bash",
+      tool_input: { command: 'npm start -- "x"' },
+      cwd: repo.wip,
+      duration_ms: 60000,
+    });
     assert.equal(r.code, 0, r.stderr);
     const ctx = r.json.hookSpecificOutput.additionalContext;
     assert.equal(r.json.hookSpecificOutput.hookEventName, "PostToolUse");
@@ -155,41 +210,75 @@ describe("hooks end to end", () => {
     assert.match(ctx, /RESULT\.md needs updating/);
     assert.doesNotMatch(ctx, /WARNING/);
   });
+  test("run-evidence: reports a failed run under PostToolUseFailure", () => {
+    const r = runIn(repo.root, "run-evidence.mjs", { hook_event_name: "PostToolUseFailure", tool_input: { command: "npm start" }, cwd: repo.wip });
+    assert.equal(r.code, 0, r.stderr);
+    assert.equal(r.json.hookSpecificOutput.hookEventName, "PostToolUseFailure");
+    assert.match(r.json.hookSpecificOutput.additionalContext, /exited with an error/);
+  });
+  test("run-evidence: takes the event cwd when the cd already happened", () => {
+    const r = runIn(repo.root, "run-evidence.mjs", { tool_input: { command: "cd ../../Agent_Orc/9.9_hook_selftest && npm start" }, cwd: repo.wip });
+    assert.match(r.json.hookSpecificOutput.additionalContext, /9\.9_hook_selftest/);
+  });
   test("run-evidence: warns when the newest log predates the run", () => {
-    const f = join(SCRATCH, "Log", "20261020-120000_run.log");
-    utimesSync(f, new Date("2020-06-01T00:00:00Z"), new Date("2020-06-01T00:00:00Z"));
-    const r = runHook("run-evidence.mjs", { tool_input: { command: "npm start" }, cwd: SCRATCH });
-    assert.match(r.json.hookSpecificOutput.additionalContext, /WARNING the newest log was last written 2020-06-01T00:00:00.000Z/);
+    const f = join(repo.wip, "Log", "20261020-120000_run.log");
+    const old = new Date(Date.now() - 90_000);
+    utimesSync(f, old, old);
+    const r = runIn(repo.root, "run-evidence.mjs", { tool_input: { command: "npm start" }, cwd: repo.wip, duration_ms: 30_000 });
+    assert.match(r.json.hookSpecificOutput.additionalContext, /WARNING the newest log was last written/);
+    utimesSync(f, new Date(), new Date());
   });
   test("run-evidence: background runs get a reminder, not a summary", () => {
-    const r = runHook("run-evidence.mjs", { tool_input: { command: "npm start", run_in_background: true }, cwd: SCRATCH });
+    const r = runIn(repo.root, "run-evidence.mjs", { tool_input: { command: "npm start", run_in_background: true }, cwd: repo.wip });
     assert.match(r.json.hookSpecificOutput.additionalContext, /in the background/);
   });
   test("run-evidence: silent for other commands and outside exercises", () => {
     for (const event of [
-      { tool_input: { command: "npm test" }, cwd: SCRATCH },
-      { tool_input: { command: "npm start" }, cwd: PROJECT_ROOT },
+      { tool_input: { command: "npm test" }, cwd: repo.wip },
+      { tool_input: { command: "echo npm start" }, cwd: repo.wip },
+      { tool_input: { command: "npm start" }, cwd: repo.root },
       { tool_input: null },
     ]) {
-      const r = runHook("run-evidence.mjs", event);
+      const r = runIn(repo.root, "run-evidence.mjs", event);
       assert.equal(r.code, 0, r.stderr);
       assert.equal(r.stdout, "");
     }
   });
 
   test("exercise-completeness: blocks once on a changed, incomplete exercise", () => {
-    const r = runHook("exercise-completeness.mjs", { hook_event_name: "Stop", stop_hook_active: false });
+    const r = runIn(repo.root, "exercise-completeness.mjs", { hook_event_name: "Stop", stop_hook_active: false });
     assert.equal(r.code, 0, r.stderr);
     assert.equal(r.json.decision, "block");
     assert.match(r.json.reason, /Agent_Orc\/9\.9_hook_selftest:/);
     assert.match(r.json.reason, /README\.md: section "What to watch for" is missing/);
     assert.match(r.json.reason, /RESULT\.md is missing/);
     assert.match(r.json.reason, /no row in docs\/curriculum\.md/);
-    assert.doesNotMatch(r.json.reason, /1\.3_subagent_invocation/);
+    assert.match(r.json.reason, /Start no exercise run/);
+    assert.doesNotMatch(r.json.reason, /1\.1_done/);
   });
-  test("exercise-completeness: lets the stop through on the retry", () => {
-    const r = runHook("exercise-completeness.mjs", { hook_event_name: "Stop", stop_hook_active: true });
-    assert.equal(r.code, 0, r.stderr);
-    assert.equal(r.stdout, "");
+  test("exercise-completeness: lets the stop through on the retry or while a run is in the background", () => {
+    for (const event of [{ stop_hook_active: true }, { stop_hook_active: false, background_tasks: [{ id: "b1" }] }]) {
+      const r = runIn(repo.root, "exercise-completeness.mjs", event);
+      assert.equal(r.code, 0, r.stderr);
+      assert.equal(r.stdout, "");
+    }
+  });
+  test("exercise-completeness: a deleted exercise is not unfinished work", () => {
+    rmSync(repo.done, { recursive: true, force: true });
+    const r = runIn(repo.root, "exercise-completeness.mjs", { stop_hook_active: false });
+    assert.doesNotMatch(r.json.reason, /1\.1_done/);
+    repo.git("checkout", "--", ".");
+  });
+  test("exercise-completeness: silent outside a git repository", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ccaf-nogit-"));
+    try {
+      mkdirSync(join(dir, "docs"));
+      writeFileSync(join(dir, "docs", "curriculum.md"), "");
+      const r = runIn(dir, "exercise-completeness.mjs", { stop_hook_active: false });
+      assert.equal(r.code, 0, r.stderr);
+      assert.equal(r.stdout, "");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

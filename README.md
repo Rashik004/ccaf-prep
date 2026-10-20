@@ -23,7 +23,7 @@ This file covers what every exercise shares: setup, the API key, logging and out
   output/         artefacts the program produces (gitignored)
 common/           shared helpers: .env reading, logging, timestamps
 docs/             curriculum map and notes that span several tasks
-.claude/          Claude Code hooks for working on this repo
+.claude/          Claude Code hooks, skills and agents for working on this repo
 ```
 
 Domain folders: `Agent_Orc` (1), `Tool_MCP` (2), `CC_Config` (3), `Prompt_Eng` (4), `Context_Mgmt` (5).
@@ -173,7 +173,7 @@ npm test
 | `SessionStart` | `curriculum-status` | Adds done / in progress / todo counts and the next three todo tasks to Claude's context. Warns when no usable `ANTHROPIC_API_KEY` is in `.env` or the terminal. |
 | `UserPromptSubmit` | `task-id-context` | When the prompt names a task ID such as `1.4`, adds that curriculum row: title, status, folder, lesson URL. |
 | `PreToolUse` (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`) | `protect-generated-paths` | Denies writes to an exercise's `Log/` or `output/`, any `node_modules/`, `.env` and `.env.*` (not `.env.example`), and `package-lock.json`. Writes through the shell are not covered. |
-| `PostToolUse` (`Bash`, `PowerShell`) | `run-evidence` | After `npm start` in an exercise folder, adds the newest run log's summary (model, tokens and cost per model, duration, outcome) and a RESULT.md reminder. Warns when the newest log is older than the run. |
+| `PostToolUse`, `PostToolUseFailure` (`Bash`, `PowerShell`) | `run-evidence` | After `npm start` in an exercise folder, failed or not, adds the newest run log's summary (model, tokens and cost per model, duration, outcome) and a RESULT.md reminder. Warns when the newest log is older than the run. |
 | `Stop` | `exercise-completeness` | When an exercise folder has uncommitted changes, checks that README.md and RESULT.md have their required sections in order and that the curriculum row is past `todo`. Blocks the stop once with the gaps. |
 
 `npm test` at the repo root (after `npm install` there) also runs the hook tests.

@@ -1,6 +1,6 @@
 # {{ID}} {{TITLE}} — result
 
-Written after a successful run, from its log.
+Written from a run log. Sections 1 to 3 come from the log; sections 4 to 6 are the revision notes.
 
 ## 1. Run
 

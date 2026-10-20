@@ -97,15 +97,24 @@ export function newestLog(folderAbs) {
  * the session's edits, so uncommitted changes (tracked or untracked, never ignored) stand in.
  */
 export function changedExercises(root) {
-  const out = execFileSync("git", ["status", "--porcelain", "-z", "--untracked-files=all"], {
-    cwd: root,
-    encoding: "utf8",
-  });
+  let out;
+  try {
+    // --no-optional-locks: a status run must not collide with a commit in another terminal.
+    out = execFileSync("git", ["--no-optional-locks", "status", "--porcelain", "-z", "--untracked-files=all"], {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return []; // no git, or not a repository: nothing to check
+  }
   const folders = new Map();
   // -z entries are "XY path"; a rename adds the old path as its own NUL-separated entry.
   for (const entry of out.split("\0")) {
     const ex = exerciseOf(entry.length > 3 && entry[2] === " " ? entry.slice(3) : entry);
-    if (ex) folders.set(ex.folder, ex);
+    // A deleted or renamed-away exercise is not unfinished work.
+    if (ex && existsSync(join(root, ...ex.folder.split("/")))) folders.set(ex.folder, ex);
   }
   return [...folders.values()];
 }

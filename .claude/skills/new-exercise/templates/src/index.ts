@@ -5,14 +5,18 @@ import { loadAnthropicApiKey, loadAnthropicModel } from "../../../common/env";
 import { log } from "./log";
 
 async function main() {
-  log.banner(process.argv.slice(2).join(" ") || "(no prompt)", {
+  const prompt = process.argv.slice(2).join(" ");
+  log.banner(prompt || "(no prompt)", {
     started: new Date().toISOString(),
     key: loadAnthropicApiKey(),
     model: loadAnthropicModel() ?? "SDK default",
   });
 
-  // TODO({{ID}}): one call per Build Exercise step; log each model and tool call with log.record().
+  // TODO({{ID}}): one block per Build Exercise step. Log every model call and tool call in
+  // full with log.record(): request as sent, response as received, usage, duration.
+  const result = "";
 
+  console.log(result); // the program's result is the only thing on stdout
   log.finished("done");
 }
 

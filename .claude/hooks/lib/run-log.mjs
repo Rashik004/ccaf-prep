@@ -49,6 +49,7 @@ export function summariseLog(path, size) {
     const cost = typeof result.total_cost_usd === "number" ? `$${result.total_cost_usd.toFixed(4)}` : "?";
     lines.push(`Totals: ${secs}, ${n(result.num_turns)} turns, ${cost}`);
     for (const [name, u] of Object.entries(result.modelUsage ?? {})) {
+      if (!u || typeof u !== "object") continue;
       const cost = typeof u.costUSD === "number" ? `$${u.costUSD.toFixed(4)}` : "?";
       lines.push(
         `  ${name}: input ${n(u.inputTokens)}, output ${n(u.outputTokens)}, ` +
@@ -61,26 +62,41 @@ export function summariseLog(path, size) {
   return lines;
 }
 
-const ARG = String.raw`(?:"[^"]*"|'[^']*'|[^\s;&|]+)`;
+const ARG = String.raw`(?:"[^"]*"|'[^']*'|[^\s;&|()<>]+)`;
+// npm flags that take a value; any other flag stands alone.
+const VALUE_FLAG = String.raw`(?:--prefix|--workspace|-w|--loglevel)(?:=|\s+)${ARG}`;
 
 /**
- * An npm start command: npm start, npm run start, npm --prefix <dir> start, with flags.
- * "start" must be the npm command itself, so npm install start-server does not count.
+ * An npm start command at the start of a shell command: npm start, npm run start,
+ * npm --prefix <dir> start, with flags and redirection. "start" must be the npm command
+ * itself (npm install start-server does not count), and npm must be the command being
+ * run (echo npm start, git commit -m "npm start" do not count).
  */
 export const NPM_START = new RegExp(
-  String.raw`\bnpm(?:\.cmd)?(?:\s+(?:--prefix[=\s]+${ARG}|-[\w-]+))*\s+(?:run(?:-script)?\s+)?start(?=\s|$|[;&|])`
+  String.raw`(?:^|[;&|(\n])\s*npm(?:\.cmd)?(?:\s+(?:${VALUE_FLAG}|-[\w-]+))*\s+(?:run(?:-script)?\s+)?start(?=\s|$|[;&|<>)])`
 );
 
-/** Where the command ran npm start: its --prefix, else the cd chain before it, else the hook cwd. */
-export function runDir(command, cwd) {
+const CD = new RegExp(
+  String.raw`(?:^|[;&|(\n])\s*(?:cd|pushd|sl|Set-Location|Push-Location)(?:\s+-(?:Path|LiteralPath))?\s+(${ARG})`,
+  "gi"
+);
+
+/**
+ * Where the command ran npm start: its --prefix, else the cd chain before it, applied to
+ * `cwd`. `root` replaces $CLAUDE_PROJECT_DIR in the command.
+ */
+export function runDir(command, cwd, root) {
   const unquote = (s) => s.replace(/^(["'])(.*)\1$/, "$2");
-  const fix = (p) => (process.platform === "win32" ? canonical(unquote(p)) : unquote(p));
-  const start = command.search(NPM_START);
-  if (start === -1) return cwd;
+  const expand = (s) => s.replace(/\$(?:env:)?\{?CLAUDE_PROJECT_DIR\}?/g, root);
+  const fix = (p) => {
+    const plain = expand(unquote(p));
+    return process.platform === "win32" ? canonical(plain) : plain;
+  };
+  const match = NPM_START.exec(command);
+  if (!match) return cwd;
   let dir = cwd;
-  for (const [, to] of command.slice(0, start).matchAll(new RegExp(String.raw`\b(?:cd|Set-Location|pushd)\s+(${ARG})`, "g"))) {
-    dir = resolve(dir, fix(to));
-  }
-  const prefix = new RegExp(String.raw`--prefix[=\s]+(${ARG})`).exec(command.slice(start).match(NPM_START)[0]);
+  for (const [, to] of command.slice(0, match.index + 1).matchAll(CD)) dir = resolve(dir, fix(to));
+  const rest = command.slice(match.index);
+  const prefix = new RegExp(String.raw`--prefix(?:=|\s+)(${ARG})`).exec(rest.split(/[;&|\n]/)[0]);
   return prefix ? resolve(dir, fix(prefix[1])) : dir;
 }
