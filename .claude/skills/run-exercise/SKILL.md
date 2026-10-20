@@ -11,7 +11,7 @@ Run the exercise for **$ARGUMENTS**. The first word is the task ID. The rest, if
 
 Take the folder from the task's row in `docs/curriculum.md`. Stop if the row has no folder or the folder has no `package.json`.
 
-Program arguments: pass the ones the user typed, as typed. If there are none, take the `npm start -- …` line from the README's `## Run` section. If that line still holds a placeholder (`<…>` or `{{…}}`), or there is no such line, stop and ask the user for the prompt. A run on a placeholder prompt wastes money.
+Program arguments: pass the ones the user typed, as typed. If there are none, take the `npm start -- …` line from the README's `## Run` section. If that line still holds a template placeholder (`{{…}}` or `<example prompt>`), or there is no such line, stop and ask the user for the prompt. A run on a placeholder prompt wastes money.
 
 ## 2. Run
 

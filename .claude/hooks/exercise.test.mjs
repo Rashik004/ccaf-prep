@@ -123,6 +123,8 @@ describe("npm start detection", () => {
       "npm start>out.txt",
       "(cd X && npm start)",
       "npm start 2>&1 | tail",
+      "DEBUG_TRACE=0 npm start",
+      "time npm start",
     ]) {
       assert.ok(NPM_START.test(c), c);
     }
@@ -227,6 +229,17 @@ describe("hooks end to end", () => {
     const r = runIn(repo.root, "run-evidence.mjs", { tool_input: { command: "npm start" }, cwd: repo.wip, duration_ms: 30_000 });
     assert.match(r.json.hookSpecificOutput.additionalContext, /WARNING the newest log was last written/);
     utimesSync(f, new Date(), new Date());
+  });
+  test("run-evidence: follows a cd out of one exercise into another", () => {
+    const other = join(repo.root, "Agent_Orc", "9.8_other");
+    mkdirSync(join(other, "Log"), { recursive: true });
+    writeFileSync(join(other, "Log", "a.log"), readFileSync(FIXTURE_LOG));
+    try {
+      const r = runIn(repo.root, "run-evidence.mjs", { tool_input: { command: "cd ../9.8_other && npm start" }, cwd: repo.wip });
+      assert.match(r.json.hookSpecificOutput.additionalContext, /9\.8_other/);
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
   });
   test("run-evidence: background runs get a reminder, not a summary", () => {
     const r = runIn(repo.root, "run-evidence.mjs", { tool_input: { command: "npm start", run_in_background: true }, cwd: repo.wip });

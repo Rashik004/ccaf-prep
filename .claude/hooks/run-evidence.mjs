@@ -20,11 +20,14 @@ runHook("run-evidence", () => {
   if (!NPM_START.test(command)) return;
   const eventName = event.hook_event_name === "PostToolUseFailure" ? "PostToolUseFailure" : "PostToolUse";
 
-  // The event cwd is where the shell ended up, after any cd in the command. Only when that
-  // is not an exercise does the command's own cd chain or --prefix say where npm ran.
+  // The docs do not say whether the event cwd is taken before or after a cd in the command.
+  // A command that moves (cd or --prefix) is resolved from its own path first; when that
+  // lands outside an exercise, the cd was already applied and the event cwd is the answer.
   const cwd = typeof event.cwd === "string" && event.cwd ? event.cwd : PROJECT_ROOT;
-  const folder =
-    exerciseFolderFor(cwd, PROJECT_ROOT) ?? exerciseFolderFor(runDir(command, cwd, PROJECT_ROOT), PROJECT_ROOT);
+  const fromCwd = exerciseFolderFor(cwd, PROJECT_ROOT);
+  const ran = runDir(command, cwd, PROJECT_ROOT);
+  const fromCommand = ran === cwd ? undefined : exerciseFolderFor(ran, PROJECT_ROOT);
+  const folder = fromCommand ?? fromCwd;
   if (!folder) return; // npm start outside an exercise folder is not an exercise run
 
   if (input.run_in_background) {

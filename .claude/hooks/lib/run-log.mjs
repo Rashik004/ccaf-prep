@@ -68,12 +68,12 @@ const VALUE_FLAG = String.raw`(?:--prefix|--workspace|-w|--loglevel)(?:=|\s+)${A
 
 /**
  * An npm start command at the start of a shell command: npm start, npm run start,
- * npm --prefix <dir> start, with flags and redirection. "start" must be the npm command
+ * npm --prefix <dir> start, with flags, redirection, env assignments and `time`. "start" must be the npm command
  * itself (npm install start-server does not count), and npm must be the command being
  * run (echo npm start, git commit -m "npm start" do not count).
  */
 export const NPM_START = new RegExp(
-  String.raw`(?:^|[;&|(\n])\s*npm(?:\.cmd)?(?:\s+(?:${VALUE_FLAG}|-[\w-]+))*\s+(?:run(?:-script)?\s+)?start(?=\s|$|[;&|<>)])`
+  String.raw`(?:^|[;&|(\n])\s*(?:time\s+)?(?:\w+=\S*\s+)*npm(?:\.cmd)?(?:\s+(?:${VALUE_FLAG}|-[\w-]+))*\s+(?:run(?:-script)?\s+)?start(?=\s|$|[;&|<>)])`
 );
 
 const CD = new RegExp(
