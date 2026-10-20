@@ -26,6 +26,11 @@ Paths are relative to the repo root: the folder that holds `CLAUDE.md`. You only
 - **Totals**: in an Agent SDK run, the last `type=result` record holds `duration_ms`, `num_turns`, `total_cost_usd` and `modelUsage`. `modelUsage` is the run total per model (`inputTokens`, `outputTokens`, `cacheReadInputTokens`, `cacheCreationInputTokens`, `costUSD`). The record's top-level `usage` and `num_turns` cover the coordinator only. A run on the plain Messages API has no result record. Sum the `usage` blocks of its response records, and say that the total is a sum.
 - **Raw dumps**: `=== <title> ===` … `=== END ===`.
 
+Runs come in two shapes, and they record different things:
+
+- **Messages API runs** (exercise 1.1): each call is a `===== iteration N request (messages.create) =====` record holding the full request (model, system, messages, tools, params), followed by its response record (content blocks, `stop_reason`, `usage`).
+- **Agent SDK runs** (exercise 1.3): `stream[N]` records, an init record (`model`, `tools`, `agents`), `── Agent call ▶` blocks with subagent prompts, and a closing `type=result` record. There is no request body: the system prompt, the tools array and the per-call params are mostly absent from the log.
+
 ## Method
 
 1. Map the log before you read it: `wc -l`, then `grep -n` for the markers, `^===== ` and `^=== `. Pipe every grep through `cut -c1-300`, because one long quoted line can flood your context. Read slices with `Read` offset/limit around each hit. Read the whole file only when it is under 500 lines.
@@ -37,7 +42,7 @@ You are done when every heading below is filled from the log, every acceptance b
 
 ## Report
 
-Return exactly these headings, in this order. Quote with the line number, like `L796: → calling doc-analysis (claude-sonnet-5-5) on: …`. Write "none in the log" for an empty section rather than leaving it out.
+Return exactly the eight headings below, in this order, plus a ninth, `## Call samples`, only when the request asks for `Call samples`. Quote with the line number, like `L796: → calling doc-analysis (claude-sonnet-5-5) on: …`. Write "none in the log" for an empty section rather than leaving it out.
 
 ```
 ## Run
@@ -64,3 +69,18 @@ Errors, retries, parse failures, unhandled messages, warnings, and any gap betwe
 ## Acceptance evidence
 One line per acceptance behaviour: SHOWN / NOT SHOWN / PARTLY, then the quoted evidence with its line number. If you received no behaviours, write "no acceptance behaviours given".
 ```
+
+### Call samples (only when asked)
+
+The caller rebuilds `POST /v1/messages` bodies from this section, so it holds what the log recorded, verbatim, and names every field the log lacks. A reconstruction built on a guessed field is worse than one with a marked gap.
+
+```
+## Call samples
+One sample per distinct kind of call the run has: first turn, tool-use turn, subagent call, final turn. For each:
+### <kind>: <role>, call <n>, L<a>-L<b>
+Request: model, system, messages, tools, params (max_tokens and the like), each verbatim with its line number.
+Response: content blocks, stop_reason, usage, each verbatim with its line number.
+Not in log: every request or response field this sample lacks.
+```
+
+Cut any string over about 500 characters to its first 500 plus `… <N> more chars, L<n>`, and mark every cut. In an Agent SDK run, take what the stream shows (the assistant `message` with its `id`, `model`, `content` and `usage`; the init record's `tools`, `agents` and `model`; the subagent prompt from its `── Agent call ▶` block) and list the request body fields under `Not in log:`.
