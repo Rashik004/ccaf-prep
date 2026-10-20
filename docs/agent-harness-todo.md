@@ -20,13 +20,15 @@ Still open before the `exercise-completeness` hook can pass on 1.3: its `README.
 
 ## Hooks
 
-Configured in `.claude/settings.json`. Scripts live in `.claude/hooks/`.
+Configured in `.claude/settings.json`. Scripts live in `.claude/hooks/`, plain Node.js `.mjs` with no dependencies; tests in `.claude/hooks/hooks.test.mjs` run with `npm test`.
+
+Built: `curriculum-status`, `task-id-context`, `protect-generated-paths`.
 
 | P | Event | Matcher | Name | What it does | Why |
 |---|---|---|---|---|---|
-| P1 | `SessionStart` | | `curriculum-status` | Prints counts of done / in progress / todo tasks and the next three todo IDs from `docs/curriculum.md`. Warns when `.env` is missing or still holds the placeholder key. | Orients every session without re-reading the map; catches a dead key before an API call. |
+| P1 | `SessionStart` | | `curriculum-status` | Prints counts of done / in progress / todo tasks and the next three todo IDs from `docs/curriculum.md`. Warns when neither `.env` nor the terminal holds a usable `ANTHROPIC_API_KEY` (same lookup as `common/env.ts`). | Orients every session without re-reading the map; catches a dead key before an API call. |
 | P1 | `UserPromptSubmit` | | `task-id-context` | When the prompt contains a task ID (`1.4`, `3.2`), injects that row from the curriculum: title, lesson URL, folder, status. | Makes the lesson page the reference point automatically, per `CLAUDE.md`. |
-| P1 | `PreToolUse` | `Write\|Edit` | `protect-generated-paths` | Denies writes under `Log/`, `output/`, `node_modules/`, and to `.env` or `package-lock.json`. | Logs are evidence; they are read, never hand-edited. |
+| P1 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `protect-generated-paths` | Denies writes under an exercise's `Log/` or `output/`, any `node_modules/`, and to `.env`, `.env.*` (except `.env.example`) or `package-lock.json`. Windows aliases (`/f/`, `\\?\`, `\\?\UNC\`, `\\<any host>\F$`, `::$DATA`) resolve to the same check. Bash-tool writes are not covered. | Logs are evidence; they are read, never hand-edited. |
 | P1 | `PreToolUse` | `Bash` | `git-guard` | Blocks `git add -A` / `git add .` when the working tree contains unignored `Log/`, `output/` or `.env` paths; blocks commit messages carrying a Claude attribution trailer. | Keeps generated files and attribution out of history, matching the user-level rule. |
 | P1 | `PostToolUse` | `Write\|Edit` | `typecheck-on-save` | For a `.ts` file, runs `tsc --noEmit` in the nearest folder with a `package.json` and returns errors as feedback. | Breakage surfaces at the edit, not at the run that costs API money. |
 | P2 | `PostToolUse` | `Bash` | `run-evidence` | After a command containing `npm start`, finds the newest `Log/` file in that folder and prints its path, size, model, token totals and duration, then reminds that `RESULT.md` needs updating. | Closes the loop from run to write-up; the summary line is what `RESULT.md` section 1 needs. |
@@ -87,7 +89,7 @@ In `.claude/settings.json`, allow without prompting:
 ## Suggested build order
 
 1. Prerequisites, so the conventions the hooks check actually hold.
-2. `curriculum-status`, `task-id-context`, `protect-generated-paths`, `git-guard`, `typecheck-on-save`.
+2. ~~`curriculum-status`, `task-id-context`, `protect-generated-paths`~~ (built), `git-guard`, `typecheck-on-save`.
 3. `log-analyst` agent, then `log-analysis` skill. Validate on the five existing 1.3 logs.
 4. `lesson-researcher` agent, then `new-exercise` skill. Use it to start 1.1.
 5. `run-exercise`, `run-evidence` hook, `exercise-completeness` hook.

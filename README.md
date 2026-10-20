@@ -23,6 +23,7 @@ This file covers what every exercise shares: setup, the API key, logging and out
   output/         artefacts the program produces (gitignored)
 common/           shared helpers: .env reading, logging, timestamps
 docs/             curriculum map and notes that span several tasks
+.claude/          Claude Code hooks for working on this repo
 ```
 
 Domain folders: `Agent_Orc` (1), `Tool_MCP` (2), `CC_Config` (3), `Prompt_Eng` (4), `Context_Mgmt` (5).
@@ -158,6 +159,18 @@ Test it from the repo root:
 npm install
 npm test
 ```
+
+## Claude Code hooks
+
+`.claude/settings.json` registers hooks that shape how Claude Code works on this repo. The scripts are plain Node.js in `.claude/hooks/` and need no install. The plan for the full harness is in [`docs/agent-harness-todo.md`](docs/agent-harness-todo.md).
+
+| Event | Hook | What it does |
+|---|---|---|
+| `SessionStart` | `curriculum-status` | Adds done / in progress / todo counts and the next three todo tasks to Claude's context. Warns when no usable `ANTHROPIC_API_KEY` is in `.env` or the terminal. |
+| `UserPromptSubmit` | `task-id-context` | When the prompt names a task ID such as `1.4`, adds that curriculum row: title, status, folder, lesson URL. |
+| `PreToolUse` (`Write`, `Edit`, `MultiEdit`, `NotebookEdit`) | `protect-generated-paths` | Denies writes to an exercise's `Log/` or `output/`, any `node_modules/`, `.env` and `.env.*` (not `.env.example`), and `package-lock.json`. Writes through the shell are not covered. |
+
+`npm test` at the repo root (after `npm install` there) also runs the hook tests.
 
 ## Troubleshooting
 
