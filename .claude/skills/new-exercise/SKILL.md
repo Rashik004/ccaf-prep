@@ -75,4 +75,4 @@ In the `$ARGUMENTS` row of `docs/curriculum.md`, set Folder to `` `<domain>/<fol
 
 ## 7. Hand over
 
-Tell the user the folder path and the next step: write `src/` against the acceptance behaviours in the README, then run `/run-exercise $ARGUMENTS`.
+Tell the user the folder path and the next steps: `/build-exercise $ARGUMENTS` writes `src/` against the acceptance behaviours in the README, then `/run-exercise $ARGUMENTS` runs it.
