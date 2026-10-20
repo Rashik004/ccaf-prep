@@ -1,0 +1,19 @@
+{
+  "name": "ccaf-1-1-agentic-loops",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CCA-F task 1.1: Agentic Loops",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0"
+  }
+}

@@ -10,7 +10,7 @@ Folder: `Agent_Orc/`
 
 | ID | Title | Lesson | Folder | Status |
 |---|---|---|---|---|
-| 1.1 | Agentic Loops | https://claudecertificationguide.com/learn/1-agentic-architecture/1-1-agentic-loops | | todo |
+| 1.1 | Agentic Loops | https://claudecertificationguide.com/learn/1-agentic-architecture/1-1-agentic-loops | `Agent_Orc/1.1_agentic_loops` | in progress |
 | 1.2 | Multi-Agent Orchestration | https://claudecertificationguide.com/learn/1-agentic-architecture/1-2-orchestration-patterns | | todo |
 | 1.3 | Subagent Invocation and Context Passing | https://claudecertificationguide.com/learn/1-agentic-architecture/1-3-subagent-invocation-context | `Agent_Orc/1.3_subagent_invocation` | done |
 | 1.4 | Workflow Enforcement and Handoff | https://claudecertificationguide.com/learn/1-agentic-architecture/1-4-workflow-enforcement-handoff | | todo |
