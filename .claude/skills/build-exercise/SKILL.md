@@ -2,7 +2,6 @@
 name: build-exercise
 description: Write the src/ code for a scaffolded exercise, from the acceptance behaviours in its README. Asks when the spec is unclear, uses subagents for larger exercises, and stops before any paid run.
 argument-hint: <task-id, e.g. 1.1>
-disable-model-invocation: true
 ---
 
 Write the code for exercise **$ARGUMENTS**. The code is the study aid: a reader who has not seen the lesson opens `src/`, reads it top to bottom once, and understands the lesson's concept from it. Every choice below serves that reader. This skill covers steps 3 and 5 of "Starting a new exercise" in `CLAUDE.md` up to the first run. It never runs `npm start`: a run costs money and belongs to `/run-exercise`.
@@ -99,3 +98,5 @@ Update the README's `## Source files` table: one row per file in `src/`, with th
 - the behaviour map: each behaviour, its log line, and its check,
 - the decisions from step 3,
 - the next steps: `/gist $ARGUMENTS`, which needs no run, then `/run-exercise $ARGUMENTS`, which costs money for one run.
+
+If the user asked for the whole exercise to be completed, invoke `gist $ARGUMENTS` and then `run-exercise $ARGUMENTS` yourself instead of handing over.

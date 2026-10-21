@@ -2,7 +2,6 @@
 name: run-exercise
 description: Run one exercise with npm start, analyse its log, fill in RESULT.md sections 1 to 4 from the log, and report which acceptance behaviours showed up. Each run calls the Anthropic API and costs money.
 argument-hint: <task-id> [program arguments]
-disable-model-invocation: true
 ---
 
 Run the exercise for **$ARGUMENTS**. The first word is the task ID. The rest, if any, is the program's arguments. Typing this command is the user's approval to spend money on **one** run. A retry is a second run and needs the user's approval again.

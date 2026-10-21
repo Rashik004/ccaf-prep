@@ -2,7 +2,6 @@
 name: new-exercise
 description: Start the exercise for one curriculum task ID. Researches the lesson, agrees the acceptance behaviours with you, then scaffolds the folder and marks the task in progress.
 argument-hint: <task-id, e.g. 1.1>
-disable-model-invocation: true
 ---
 
 Start the exercise for task **$ARGUMENTS**. This skill covers steps 1 to 4 of "Starting a new exercise" in `CLAUDE.md`: research, acceptance behaviours, scaffold, status. The user approves the acceptance behaviours before anything is written to the repo. The code is written after the scaffold.
@@ -76,3 +75,5 @@ In the `$ARGUMENTS` row of `docs/curriculum.md`, set Folder to `` `<domain>/<fol
 ## 7. Hand over
 
 Tell the user the folder path and the next steps: `/build-exercise $ARGUMENTS` writes `src/` against the acceptance behaviours in the README, then `/run-exercise $ARGUMENTS` runs it.
+
+If the user asked for the whole exercise to be completed, invoke `build-exercise $ARGUMENTS` yourself instead of handing over.
