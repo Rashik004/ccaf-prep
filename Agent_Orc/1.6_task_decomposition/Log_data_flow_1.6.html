@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1.6 Task Decomposition Strategies: data flow</title>
+<style>
+:root{
+  --bg:#f7f6f2; --card:#ffffff; --ink:#1d1d1b; --muted:#6a6a64; --line:#d8d6cf;
+  --accent:#2f5fb3; --accent-bg:#e7eefb; --warn:#b3412f; --warn-bg:#fbe9e5; --code-bg:#f0efe9;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16171a; --card:#1f2024; --ink:#ecebe6; --muted:#a3a29b; --line:#3a3b40;
+    --accent:#86a9ef; --accent-bg:#1f2b44; --warn:#ef8e7c; --warn-bg:#3d2420; --code-bg:#26272c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16171a; --card:#1f2024; --ink:#ecebe6; --muted:#a3a29b; --line:#3a3b40;
+  --accent:#86a9ef; --accent-bg:#1f2b44; --warn:#ef8e7c; --warn-bg:#3d2420; --code-bg:#26272c;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:32px 16px 64px}
+a{color:var(--accent)}
+header .id{color:var(--muted);font-weight:600;letter-spacing:.04em}
+h1{font-size:1.8rem;margin:0 0 4px;overflow-wrap:anywhere}
+h2{font-size:1.25rem;margin:40px 0 8px;padding-top:8px;border-top:1px solid var(--line)}
+h2 .n{color:var(--muted);font-weight:500;margin-right:6px}
+h3{font-size:1.05rem;margin:0 0 4px}
+p{margin:6px 0}
+.sub{color:var(--muted);margin:4px 0 12px}
+nav{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.95rem}
+.note{background:var(--warn-bg);border-left:4px solid var(--warn);padding:10px 14px;border-radius:6px;margin:16px 0;font-size:.95rem}
+.tag{display:inline-block;background:var(--accent-bg);color:var(--accent);border-radius:999px;padding:0 8px;font-size:.8rem;font-weight:600}
+.mermaid{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin:14px 0;overflow-x:auto}
+.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:14px 0;min-width:0}
+.step .where{color:var(--muted);font-size:.9rem}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+pre{background:var(--code-bg);border-radius:8px;padding:10px 12px;overflow-x:auto;margin:8px 0;max-width:100%}
+pre code{background:none;padding:0;font-size:.85rem;overflow-wrap:normal}
+.tw{overflow-x:auto;margin:10px 0}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="id">Task 1.6</div>
+  <h1><a href="https://claudecertificationguide.com/learn/1-agentic-architecture/1-6-task-decomposition">Task Decomposition Strategies</a></h1>
+  <p class="sub">The run RESULT.md describes: 12 Messages API calls (1 single-pass over all 10 files, 10 one-file local passes, 1 integration pass over the summaries), no tools, structured JSON output, every call <code>end_turn</code>.</p>
+  <nav><a href="README.md">README</a><a href="RESULT.md">RESULT</a><a href="Gist_1.6.html">Gist</a></nav>
+</header>
+
+<section><h2><span class="n">1</span>The run</h2>
+<div class="tw"><table>
+<tr><th>Log</th><td><code>Log/20261022-001038_run.log</code> (2,429 lines)</td></tr>
+<tr><th>Date</th><td>2026-10-22 00:10:38 local (L4 <code>started: 2026-10-21T18:10:38.659Z</code>)</td></tr>
+<tr><th>Command</th><td><code>npm start -- 'sample-repo'</code>, from <code>Agent_Orc/1.6_task_decomposition</code> (L3 <code>▶ RUN  review …\sample-repo</code>)</td></tr>
+<tr><th>Model</th><td><code>claude-sonnet-5-5</code> on all 12 calls (L6)</td></tr>
+<tr><th>Model calls</th><td>12: 1 single-pass, 10 local-pass, 1 integration. 12 distinct <code>msg_</code> ids</td></tr>
+<tr><th>Tokens</th><td>27,828 input, 9,406 output (of which 1,465 thinking). Cache read and write are 0 on every call</td></tr>
+<tr><th>Cost</th><td>$0.1497, from RESULT.md section 2, which cites this same log. The log itself holds no USD figure: Messages API responses report tokens, not USD</td></tr>
+<tr><th>Duration</th><td>93,670 ms model time, the sum of the per-call durations (L2428)</td></tr>
+<tr><th>Outcome</th><td>Completed. All 11 <code>CHECK</code> lines PASS. Closing line L2428: <code>■ 12 model calls, tokens in=27828 out=9406, model time 93670 ms</code></td></tr>
+</table></div>
+</section>
+
+<section><h2><span class="n">2</span>Sequence</h2>
+<p>The program drives a fixed chain. The model never chooses the next step, and no tool is called (<code>"tools"</code> appears 0 times in the log). Stage 2 receives stage 1's parsed JSON verbatim.</p>
+<div class="mermaid">sequenceDiagram
+  participant P as Program (chain driver)
+  participant A as Messages API (reviewer)
+  Note over P: Step 1: load 10 files, CHECK files&gt;=10 (L22), answer key matches (L24)
+  Note over P,A: Step 2: baseline, one context
+  P->>A: 1 single-pass: system + all 10 numbered files (L37)
+  A-->>P: files[10] JSON, end_turn, 4602/1002 tok (L145)
+  Note over P: CHECK single-pass calls==1 (L259), depth: drop-off not observed (L270)
+  Note over P,A: Step 3: chain stage 1, one fresh context per file
+  P->>A: 2 local-pass 01_db.ts
+  A-->>P: summary JSON, 1641/556 (L433)
+  P->>A: 3 local-pass 02_product-repo.ts
+  A-->>P: summary JSON, 1625/741 (L627)
+  P->>A: 4 local-pass 03_warehouse-repo.ts
+  A-->>P: thinking + summary, 1631/804 (L836)
+  P->>A: 5 local-pass 04_pricing.ts
+  A-->>P: thinking + summary, 1498/823 (L1036)
+  P->>A: 6 local-pass 05_format.ts
+  A-->>P: thinking + summary, 1441/606 (L1232)
+  P->>A: 7 local-pass 06_stock-service.ts
+  A-->>P: thinking + summary, 0 bugs, calls records swapped args, 1549/893 (L1425)
+  P->>A: 8 local-pass 07_supplier-client.ts
+  A-->>P: thinking + summary, 1500/517 (L1627)
+  P->>A: 9 local-pass 08_reorder.ts
+  A-->>P: summary JSON, 1574/499 (L1811)
+  P->>A: 10 local-pass 09_report.ts
+  A-->>P: summary JSON, 1568/932 (L2002)
+  P->>A: 11 local-pass 10_sync-job.ts
+  A-->>P: thinking + summary, 1628/1152 (L2221)
+  Note over P: CHECK schema-valid 10/10, bug_count==issues.length (L2259-L2260)
+  Note over P,A: Step 4: chain stage 2, summaries only
+  Note over P: CHECK input=summaries: 19606 chars vs 6842 of source (L2264-L2265)
+  P->>A: 12 integration: 10 summary objects, no source (L2275)
+  A-->>P: issues[5] JSON, end_turn, 7571/881 (L2363)
+  Note over P: CHECK categories, &gt;=2 files, calls==12 (L2415-L2422)
+  Note over P: OBSERVED: multi &gt;= single, no dilution artefact (L2423-L2425)</div>
+</section>
+
+<section><h2><span class="n">3</span>Call table</h2>
+<p>Every call has model <code>claude-sonnet-5-5</code>, <code>max_tokens</code> 16000 and stop reason <code>end_turn</code>. Thinking tokens are part of the output tokens.</p>
+<div class="tw"><table>
+<tr><th>#</th><th>Role</th><th>Model</th><th>In</th><th>Out</th><th>Thinking</th><th>ms</th><th>Stop</th><th>Log</th></tr>
+<tr><td>1</td><td>single-pass reviewer (all files)</td><td>claude-sonnet-5-5</td><td>4,602</td><td>1,002</td><td>0</td><td>8,971</td><td>end_turn</td><td>L145</td></tr>
+<tr><td>2</td><td>local reviewer 01_db.ts</td><td>claude-sonnet-5-5</td><td>1,641</td><td>556</td><td>0</td><td>6,703</td><td>end_turn</td><td>L433</td></tr>
+<tr><td>3</td><td>local reviewer 02_product-repo.ts</td><td>claude-sonnet-5-5</td><td>1,625</td><td>741</td><td>0</td><td>8,168</td><td>end_turn</td><td>L627</td></tr>
+<tr><td>4</td><td>local reviewer 03_warehouse-repo.ts</td><td>claude-sonnet-5-5</td><td>1,631</td><td>804</td><td>178</td><td>8,280</td><td>end_turn</td><td>L836</td></tr>
+<tr><td>5</td><td>local reviewer 04_pricing.ts</td><td>claude-sonnet-5-5</td><td>1,498</td><td>823</td><td>258</td><td>7,553</td><td>end_turn</td><td>L1036</td></tr>
+<tr><td>6</td><td>local reviewer 05_format.ts</td><td>claude-sonnet-5-5</td><td>1,441</td><td>606</td><td>192</td><td>5,917</td><td>end_turn</td><td>L1232</td></tr>
+<tr><td>7</td><td>local reviewer 06_stock-service.ts</td><td>claude-sonnet-5-5</td><td>1,549</td><td>893</td><td>221</td><td>8,885</td><td>end_turn</td><td>L1425</td></tr>
+<tr><td>8</td><td>local reviewer 07_supplier-client.ts</td><td>claude-sonnet-5-5</td><td>1,500</td><td>517</td><td>199</td><td>5,234</td><td>end_turn</td><td>L1627</td></tr>
+<tr><td>9</td><td>local reviewer 08_reorder.ts</td><td>claude-sonnet-5-5</td><td>1,574</td><td>499</td><td>0</td><td>5,524</td><td>end_turn</td><td>L1811</td></tr>
+<tr><td>10</td><td>local reviewer 09_report.ts</td><td>claude-sonnet-5-5</td><td>1,568</td><td>932</td><td>0</td><td>8,615</td><td>end_turn</td><td>L2002</td></tr>
+<tr><td>11</td><td>local reviewer 10_sync-job.ts</td><td>claude-sonnet-5-5</td><td>1,628</td><td>1,152</td><td>417</td><td>10,697</td><td>end_turn</td><td>L2221</td></tr>
+<tr><td>12</td><td>integration reviewer (summaries)</td><td>claude-sonnet-5-5</td><td>7,571</td><td>881</td><td>0</td><td>9,123</td><td>end_turn</td><td>L2363</td></tr>
+<tr><td></td><td><strong>Total</strong></td><td></td><td><strong>27,828</strong></td><td><strong>9,406</strong></td><td><strong>1,465</strong></td><td><strong>93,670</strong></td><td></td><td>L2428</td></tr>
+</table></div>
+</section>
+
+<section><h2><span class="n">4</span>Requests and responses</h2>
+<p>The log records each request body and response object as fields, not raw HTTP. The bodies below are rebuilt from those fields. Each request record is the complete body the program sent, so fields missing from it (<code>thinking</code>, <code>tools</code>, <code>temperature</code>) were not sent and are left out here. Long strings are cut at <code>…</code>, and the note under each body says where the full value sits.</p>
+
+<div class="step"><h3>Call 1: single-pass, all 10 files in one context <span class="tag">reconstructed</span></h3>
+<p class="where">Request L29-L108 · response L111-L145</p>
+<pre><code>POST /v1/messages
+{
+  "model": "claude-sonnet-5-5",
+  "max_tokens": 16000,
+  "system": "You are a senior TypeScript reviewer.\nReport real bugs only: code that behaves wrongly at runtime, is unsafe, or breaks a caller.\nDo not report style, naming or missing comments.\nEach finding cites the exact line number from the numbered listing you were given.\nSeverity is one of critical, high, medium, low.",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Review all 10 files below. Return one entry per file, in the order given, even when a file has no bugs.\n\n=== FILE 01_db.ts ===\n  1│ // Thin wrapper around the stock database driver.\n  2│ \n  3│ export interface Row {\n  4│   [column: string]: string | number | null;\n  5│ }\n … === FILE 10_sync-job.ts ===\n … 30│   items.forEach(async (i) =&gt; { await save(i); });\n 31│ }"
+    }
+  ],
+  "output_config": {
+    "format": {
+      "type": "json_schema",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["files"],
+        "properties": {
+          "files": {
+            "type": "array",
+            "description": "One entry per file reviewed, in the order given.",
+            "items": { "…": "required [\"file\",\"bug_count\",\"issues\"]" }
+          }
+        }
+      }
+    }
+  }
+}</code></pre>
+<p class="note">System prompt from L33. User content from L37: the line is 9,301 bytes and holds all 10 <code>=== FILE</code> headers, cut here. The schema is cut here; it is complete at L40-L108.</p>
+<pre><code>200 OK
+{
+  "id": "msg_011CgFqECF247XPTknxEqb8u",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-5-5",
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"files\":[{\"file\":\"01_db.ts\",\"bug_count\":1,\"issues\":[{\"line\":23,\"severity\":\"critical\",\"description\":\"SQL built by string concatenation with the unescaped sku, which allows SQL injection…\"}]},{\"file\":\"02_product-repo.ts\",\"bug_count\":2,… {\"line\":30,\"severity\":\"high\",\"description\":\"forEach with an async callback does not await the saves. syncAll resolves before the saves finish, and failures become unhandled rejections.\"}]}]}"
+    }
+  ],
+  "container": null,
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "stop_details": null,
+  "usage": {
+    "input_tokens": 4602,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": { "ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 0 },
+    "output_tokens": 1002,
+    "output_tokens_details": { "thinking_tokens": 0 },
+    "service_tier": "standard",
+    "inference_geo": "global",
+    "speed": "standard"
+  },
+  "diagnostics": null
+}</code></pre>
+<p class="note">Fields from L113-L143. The text block is cut here (about 2,300 more chars at L120). Duration 8,971 ms (L145). There is no thinking block.</p>
+</div>
+
+<div class="step"><h3>Call 7: local pass on 06_stock-service.ts, one file in its own context <span class="tag">reconstructed</span></h3>
+<p class="where">Request L1261-L1384 · response L1386-L1425</p>
+<pre><code>POST /v1/messages
+{
+  "model": "claude-sonnet-5-5",
+  "max_tokens": 16000,
+  "system": "You are a senior TypeScript reviewer.\n… (same as call 1)",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Review this one file.\nAlso describe its interface, for a later reviewer who will not see the source:\n- exports: each exported function's signature and behaviour (units of the result, what happens when nothing is found).\n- calls: each call into another module of the repo, with its line, callee, arguments as written, and what this caller expects back.\n\n=== FILE 06_stock-service.ts ===\n  1│ // Answers \"how many can we sell?\" for the order flow.\n  2│ \n  3│ import { getStock, warehousesHolding } from \"./03_warehouse-repo\";\n  4│ \n  5│ export async function availableUnits(sku: string, warehouseId: string): Promise&lt;number&gt; {\n  6│   const units = await getStock(warehouseId, sku);\n  7│   return Math.max(0, units);\n  8│ }\n … 22│ }"
+    }
+  ],
+  "output_config": {
+    "format": {
+      "type": "json_schema",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "bug_count", "issues", "exports", "calls"],
+        "…": "properties cut"
+      }
+    }
+  }
+}</code></pre>
+<p class="note">System prompt from L1265; it is the same string as L33. User content from L1269 (1,279 bytes); lines 9-22 (<code>totalAvailable</code>, <code>canFulfil</code>) are cut here. The schema at L1272-L1383 is byte-identical to the one in call 2 (L285-L396).</p>
+<pre><code>200 OK
+{
+  "id": "msg_011CgFqHY5D2isfXNxfshbcS",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-5-5",
+  "content": [
+    {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "CAQS8AgKEAgTGAI4AUIIdGhpbmtpbmcSDAUUn6F8VkPG2eBaNRoMWCfuwUyULme0dAIyIjDet6Eget0R1xqQsd68…"
+    },
+    {
+      "type": "text",
+      "text": "{\"file\":\"06_stock-service.ts\",\"bug_count\":0,\"issues\":[],\"exports\":[{\"signature\":\"availableUnits(sku: string, warehouseId: string): Promise&lt;number&gt;\",…}],\"calls\":[{\"line\":6,\"callee\":\"getStock from ./03_warehouse-repo\",\"arguments\":\"warehouseId, sku\",\"expects\":\"A number of units for that warehouse and SKU, possibly negative, which the caller clamps to 0. Argument order is (warehouseId, sku), the reverse of this file's own function signature. A miss is assumed to return a number or null, not to throw. An undefined result would produce NaN.\"},{\"line\":11,\"callee\":\"warehousesHolding from ./03_warehouse-repo\",\"arguments\":\"sku\",…}]}"
+    }
+  ],
+  "container": null,
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "stop_details": null,
+  "usage": {
+    "input_tokens": 1549,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": { "ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 0 },
+    "output_tokens": 893,
+    "output_tokens_details": { "thinking_tokens": 221 },
+    "service_tier": "standard",
+    "inference_geo": "global",
+    "speed": "standard"
+  },
+  "diagnostics": null
+}</code></pre>
+<p class="note">Fields from L1388-L1423. The thinking block (L1393-L1397) has empty text; its signature is cut here (about 1,450 more chars at L1396). The text block is cut (about 1,400 more chars at L1400); its parsed form is at L1428-L1460. <code>bug_count</code> 0 (L1430), yet the <code>calls</code> entry (L1450-L1451) records the swapped arguments. Stage 2 reads that entry. Duration 8,885 ms (L1425).</p>
+</div>
+
+<div class="step"><h3>Call 12: integration pass over the 10 summaries <span class="tag">reconstructed</span></h3>
+<p class="where">Request L2267-L2326 · response L2329-L2363</p>
+<pre><code>POST /v1/messages
+{
+  "model": "claude-sonnet-5-5",
+  "max_tokens": 16000,
+  "system": "You are a senior TypeScript reviewer.\n… (same as call 1)",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Below are per-file summaries of a 10-file TypeScript repo, one per file,\neach with its local findings, its exports and its calls into other modules. You do not have the source.\nReport only issues that span two or more files, in three categories:\n- data_flow: … (units, null vs throw).\n- api_consistency: a call does not match the signature or behaviour of the export it targets.\n- pattern_consistency: …\nDo not repeat a bug that sits inside one file.\n\n[\n  {\n    \"file\": \"01_db.ts\",\n    \"bug_count\": 1, … The module's source was not visible, so its real behaviour is unverified.\"\n      }\n    ]\n  }\n]"
+    }
+  ],
+  "output_config": {
+    "format": {
+      "type": "json_schema",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["issues"],
+        "properties": {
+          "issues": {
+            "type": "array",
+            "description": "Cross-file issues only; a bug inside one file belongs to the local pass.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["category", "files", "description"],
+              "properties": {
+                "category": { "type": "string", "enum": ["data_flow", "api_consistency", "pattern_consistency"], "…": "description cut" },
+                "files": { "type": "array", "items": { "type": "string" }, "description": "Every file involved, two or more." },
+                "description": { "type": "string", "description": "The mismatch, citing the call line and the export it breaks." }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}</code></pre>
+<p class="note">System prompt from L2271; it is the same string as L33. User content from L2275: the line is 20,627 bytes, holds 10 <code>"file":</code> entries, 0 <code>│</code> characters and 0 <code>=== FILE</code> headers, and is cut here. Schema from L2278-L2326.</p>
+<pre><code>200 OK
+{
+  "id": "msg_011CgFqLR8bNrLq1MtaYngPd",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-5-5",
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"issues\":[{\"category\":\"api_consistency\",\"files\":[\"06_stock-service.ts\",\"03_warehouse-repo.ts\"],\"description\":\"06_stock-service.ts line 6 calls getStock(warehouseId, sku), but 03_warehouse-repo.ts exports getStock(sku: string, warehouseId: string). The arguments are swapped, so the lookup uses the wrong key and returns 0 (never set) for every pair…\"},{\"category\":\"data_flow\",\"files\":[\"09_report.ts\",\"04_pricing.ts\",\"05_format.ts\"],…}]}"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "stop_details": null,
+  "usage": {
+    "input_tokens": 7571,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": { "ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 0 },
+    "output_tokens": 881,
+    "output_tokens_details": { "thinking_tokens": 0 },
+    "service_tier": "standard",
+    "inference_geo": "global",
+    "speed": "standard"
+  }
+}</code></pre>
+<p class="note">Fields from L2331-L2360. The text block is cut here (about 1,800 more chars at L2338). All 5 issues are parsed at L2366-L2414 and printed at L2417-L2421. Duration 9,123 ms (L2363). The analyst's sample did not report <code>container</code> or <code>diagnostics</code> for this call, so they are left out.</p>
+</div>
+</section>
+
+<section><h2><span class="n">5</span>Limits</h2>
+<ul>
+<li><strong>No cost in the log.</strong> The responses report tokens only. The USD figure comes from RESULT.md section 2, which computes it at $2.00 input and $10.00 output per million tokens.</li>
+<li><strong>No HTTP layer.</strong> The log records no headers (<code>anthropic-version</code>, API key), no request-id and no status codes. The <code>POST</code> lines and the <code>200 OK</code> above are part of the reconstruction.</li>
+<li><strong>The thinking is not visible.</strong> Six local-pass responses (calls 4-8 and 11; L805, L1005, L1201, L1394, L1596, L2190) start with a <code>thinking</code> block whose text is empty and which carries only a signature. Together they hold 1,465 thinking tokens, counted in the output tokens. No request sent a <code>thinking</code> field, so the log does not show why these blocks appeared.</li>
+<li><strong>The stdout report is not in the log.</strong> The comparison table, the seeded-issues table (9/9 vs 9/9) and the <code>Attention dilution artefacts</code> section go to stdout only. The log carries only the <code>◆ OBSERVED</code> verdicts (L2423-L2425), so behaviours 5 and 6 are PARTLY shown in the log. The answer key is checked at L24 but never scored in the log.</li>
+<li><strong>The integration call gets an ill-fitting system prompt.</strong> Call 12 receives the shared system prompt, which says "cites the exact line number from the numbered listing you were given", yet its request has no numbered listing.</li>
+<li><strong>This page cuts the long strings, not the log.</strong> The user contents (9,301, 1,279 and 20,627 bytes) and the response texts are complete in the log at the lines cited.</li>
+<li><strong>Wall time is not recorded.</strong> 93,670 ms is the summed model time. RESULT.md estimates about 94 s of wall time from the log file's mtime.</li>
+</ul>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+</script>
+</body>
+</html>
