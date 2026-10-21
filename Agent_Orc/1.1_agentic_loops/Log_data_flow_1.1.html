@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1.1 Agentic Loops: data flow</title>
+<style>
+:root{
+  --bg:#f7f6f2; --card:#ffffff; --ink:#1d1d1b; --muted:#6a6a64; --line:#d8d6cf;
+  --accent:#2f5fb3; --accent-bg:#e7eefb; --warn:#b3412f; --warn-bg:#fbe9e5; --code-bg:#f0efe9;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16171a; --card:#1f2024; --ink:#ecebe6; --muted:#a3a29b; --line:#3a3b40;
+    --accent:#86a9ef; --accent-bg:#1f2b44; --warn:#ef8e7c; --warn-bg:#3d2420; --code-bg:#26272c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16171a; --card:#1f2024; --ink:#ecebe6; --muted:#a3a29b; --line:#3a3b40;
+  --accent:#86a9ef; --accent-bg:#1f2b44; --warn:#ef8e7c; --warn-bg:#3d2420; --code-bg:#26272c;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:32px 16px 64px}
+a{color:var(--accent)}
+header .id{color:var(--muted);font-weight:600;letter-spacing:.04em}
+h1{font-size:1.8rem;margin:0 0 4px;overflow-wrap:anywhere}
+h2{font-size:1.25rem;margin:40px 0 8px;padding-top:8px;border-top:1px solid var(--line)}
+h2 .n{color:var(--muted);font-weight:500;margin-right:6px}
+h3{font-size:1.05rem;margin:0 0 4px}
+p{margin:6px 0}
+.sub{color:var(--muted);margin:4px 0 12px}
+nav{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.95rem}
+.note{background:var(--warn-bg);border-left:4px solid var(--warn);padding:10px 14px;border-radius:6px;margin:16px 0;font-size:.95rem}
+.tag{display:inline-block;background:var(--accent-bg);color:var(--accent);border-radius:999px;padding:0 8px;font-size:.8rem;font-weight:600}
+.mermaid{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin:14px 0;overflow-x:auto}
+.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:14px 0;min-width:0}
+.step .where{color:var(--muted);font-size:.9rem}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+pre{background:var(--code-bg);border-radius:8px;padding:10px 12px;overflow-x:auto;margin:8px 0;max-width:100%}
+pre code{background:none;padding:0;font-size:.85rem;overflow-wrap:normal}
+.tw{overflow-x:auto;margin:10px 0}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="id">Task 1.1</div>
+  <h1><a href="https://claudecertificationguide.com/learn/1-agentic-architecture/1-1-agentic-loops">Agentic Loops</a></h1>
+  <p class="sub">One run on the wire: three Messages API calls, two local tool calls, and the history growing by two messages per tool round until stop_reason=end_turn.</p>
+  <nav><a href="README.md">README</a><a href="RESULT.md">RESULT</a><a href="Gist_1.1.html">Gist</a></nav>
+</header>
+<section><h2><span class="n">1</span>The run</h2>
+<div class="tw"><table>
+<tr><th>Log</th><td><code>Log/20261021-010626_run.log</code> (441 lines, 13,231 bytes)</td></tr>
+<tr><th>Date</th><td>2026-10-21 local, banner <code>started: 2026-10-20T19:06:26.475Z</code> (L4)</td></tr>
+<tr><th>Command</th><td><code>npm start -- 'Search for the population of Norway, then calculate 10% of it.'</code> (from RESULT.md section 1)</td></tr>
+<tr><th>Model</th><td><code>claude-sonnet-5-5</code>, Messages API, standard tier, no caching</td></tr>
+<tr><th>Calls</th><td>3 model calls, 2 tool calls (L440)</td></tr>
+<tr><th>Tokens</th><td>2,025 input, 174 output: a sum of the three response <code>usage</code> blocks, equal to L440 <code>tokens in=2025 out=174</code></td></tr>
+<tr><th>Cost</th><td>$0.0058, from RESULT.md section 2. The log holds no cost: a Messages API response reports tokens, not USD.</td></tr>
+<tr><th>Duration</th><td>25.5 s of model time (9008 + 8042 + 8426 ms). The log has no end timestamp, so wall-clock time is unknown.</td></tr>
+</table></div></section>
+
+<section><h2><span class="n">2</span>Sequence</h2>
+<div class="mermaid">sequenceDiagram
+  participant L as Agent loop (program)
+  participant API as Claude API (claude-sonnet-5-5)
+  participant T as Local tools
+  Note over L: tools registered, CHECK passed (L46)
+  L-&gt;&gt;API: call 1: messages=[user prompt], tools x2
+  API--&gt;&gt;L: stop_reason=tool_use: web_search (9008 ms, 587 in / 51 out)
+  L-&gt;&gt;T: web_search {"query":"population of Norway"}
+  T--&gt;&gt;L: 5,600,000 (mock)
+  Note over L: CHECK tool_result ids match (L155), messages=3
+  L-&gt;&gt;API: call 2: + assistant tool_use + user tool_result
+  API--&gt;&gt;L: stop_reason=tool_use: calculator (8042 ms, 685 in / 56 out)
+  L-&gt;&gt;T: calculator {"expression":"5600000 * 0.1"}
+  T--&gt;&gt;L: {"result":560000}
+  Note over L: CHECK tool_result ids match (L290), messages=5
+  L-&gt;&gt;API: call 3: + assistant tool_use + user tool_result
+  API--&gt;&gt;L: stop_reason=end_turn: text (8426 ms, 753 in / 67 out)
+  Note over L: loop exit after 3 iterations (cap 20 not reached), CHECK sequential (L436)</div></section>
+
+<section><h2><span class="n">3</span>Calls</h2>
+<div class="tw"><table><tr><th>#</th><th>Role</th><th>Model</th><th>Input</th><th>Output</th><th>Duration</th><th>stop_reason</th></tr><tr><td>1</td><td>loop → API</td><td>claude-sonnet-5-5</td><td>587</td><td>51</td><td>9008 ms</td><td><code>tool_use (web_search)</code></td></tr><tr><td>2</td><td>loop → API</td><td>claude-sonnet-5-5</td><td>685</td><td>56</td><td>8042 ms</td><td><code>tool_use (calculator)</code></td></tr><tr><td>3</td><td>loop → API</td><td>claude-sonnet-5-5</td><td>753</td><td>67</td><td>8426 ms</td><td><code>end_turn</code></td></tr>
+<tr><th colspan="3">Total</th><th>2,025</th><th>174</th><th>25.5 s</th><th></th></tr></table></div>
+<p>Both tools run in-process; the log records no duration for them.</p></section>
+
+<section><h2><span class="n">4</span>Requests and responses</h2>
+<p>Each body is <span class="tag">reconstructed</span> from the logged request and response records, not captured HTTP. The request records hold the complete body the program passed to <code>messages.create()</code>, so these are near-verbatim. No request carried a <code>system</code> field.</p>
+<div class="step"><h3>Call 1: first turn → tool_use web_search <span class="tag">reconstructed</span></h3><p class="where">Request L50-L94 (tools L54-L87, messages L89-L92); response L96-L136 (id L99, stop_reason L116, usage L119-L127)</p>
+<p><code>POST /v1/messages</code></p><pre><code>{
+  "model": "claude-sonnet-5-5",
+  "max_tokens": 1024,
+  "tools": [
+    {
+      "name": "calculator",
+      "description": "Evaluates an arithmetic expression and returns the numeric result. Use it for any arithmetic. Supports numbers, + - * / and parentheses, e.g. \"5600000 * 0.1\". Write numbers without thousands separators.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "description": "The arithmetic expression to evaluate."
+          }
+        },
+        "required": [
+          "expression"
+        ]
+      }
+    },
+    {
+      "name": "web_search",
+      "description": "Searches the web and returns a list of results, each with a title and a snippet. Use it to look up facts you do not know, such as current figures.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query."
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "Search for the population of Norway, then calculate 10% of it."
+    }
+  ]
+}</code></pre><p>Response</p><pre><code>{
+  "id": "msg_011CgE1g7vTLrqpEGVRQ5mzm",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-5-5",
+  "content": [
+    {
+      "type": "tool_use",
+      "id": "toolu_01QZYBr85URk6EJhMLxZCt2C",
+      "name": "web_search",
+      "input": {
+        "query": "population of Norway"
+      },
+      "caller": {
+        "type": "direct"
+      }
+    }
+  ],
+  "stop_reason": "tool_use",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 587,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 51
+  }
+}</code></pre><p>The program runs web_search locally (result L142) and appends two messages: messages=3 (L156).</p></div>
+<div class="step"><h3>Call 2: tool-use turn carrying the first tool_result → tool_use calculator <span class="tag">reconstructed</span></h3><p class="where">Request L158-L229 (assistant tool_use L201-L216, tool_result L221-L224); response L231-L271 (id L234, stop_reason L251, usage L254-L262)</p>
+<p><code>POST /v1/messages</code></p><pre><code>{
+  "model": "claude-sonnet-5-5",
+  "max_tokens": 1024,
+  "tools": [
+    {
+      "name": "calculator",
+      "description": "Evaluates an arithmetic expression and returns the numeric result. Use it for any arithmetic. Supports numbers, + - * / and parentheses, e.g. \"5600000 * 0.1\". Write numbers without thousands separators.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "description": "The arithmetic expression to evaluate."
+          }
+        },
+        "required": [
+          "expression"
+        ]
+      }
+    },
+    {
+      "name": "web_search",
+      "description": "Searches the web and returns a list of results, each with a title and a snippet. Use it to look up facts you do not know, such as current figures.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query."
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "Search for the population of Norway, then calculate 10% of it."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_01QZYBr85URk6EJhMLxZCt2C",
+          "name": "web_search",
+          "input": {
+            "query": "population of Norway"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01QZYBr85URk6EJhMLxZCt2C",
+          "content": "[{\"title\":\"Norway population (mock)\",\"snippet\":\"Norway's population is 5,600,000 (mock figure).\"}]",
+          "is_error": false
+        }
+      ]
+    }
+  ]
+}</code></pre><p>Response</p><pre><code>{
+  "id": "msg_011CgE1gkNRxLZxzJtRJDYst",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-5-5",
+  "content": [
+    {
+      "type": "tool_use",
+      "id": "toolu_01GJhaHEp3ManiFXPk4Ta9eR",
+      "name": "calculator",
+      "input": {
+        "expression": "5600000 * 0.1"
+      },
+      "caller": {
+        "type": "direct"
+      }
+    }
+  ],
+  "stop_reason": "tool_use",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 685,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 56
+  }
+}</code></pre><p>Claude carries the searched figure into the calculator input (L243). The calculator returns {"result":560000} (L277); messages=5 (L291).</p></div>
+<div class="step"><h3>Call 3: final turn → end_turn <span class="tag">reconstructed</span></h3><p class="where">Request L293-L391 (new entries L363-L389); response L393-L426 (id L396, text L402, stop_reason L406, usage L409-L417)</p>
+<p><code>POST /v1/messages</code></p><pre><code>{
+  "model": "claude-sonnet-5-5",
+  "max_tokens": 1024,
+  "tools": [
+    {
+      "name": "calculator",
+      "description": "Evaluates an arithmetic expression and returns the numeric result. Use it for any arithmetic. Supports numbers, + - * / and parentheses, e.g. \"5600000 * 0.1\". Write numbers without thousands separators.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "description": "The arithmetic expression to evaluate."
+          }
+        },
+        "required": [
+          "expression"
+        ]
+      }
+    },
+    {
+      "name": "web_search",
+      "description": "Searches the web and returns a list of results, each with a title and a snippet. Use it to look up facts you do not know, such as current figures.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query."
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "Search for the population of Norway, then calculate 10% of it."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_01QZYBr85URk6EJhMLxZCt2C",
+          "name": "web_search",
+          "input": {
+            "query": "population of Norway"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01QZYBr85URk6EJhMLxZCt2C",
+          "content": "[{\"title\":\"Norway population (mock)\",\"snippet\":\"Norway's population is 5,600,000 (mock figure).\"}]",
+          "is_error": false
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_01GJhaHEp3ManiFXPk4Ta9eR",
+          "name": "calculator",
+          "input": {
+            "expression": "5600000 * 0.1"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01GJhaHEp3ManiFXPk4Ta9eR",
+          "content": "{\"result\":560000}",
+          "is_error": false
+        }
+      ]
+    }
+  ]
+}</code></pre><p>Response</p><pre><code>{
+  "id": "msg_011CgE1hLt62qVvtJHvyu5ep",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-sonnet-5-5",
+  "content": [
+    {
+      "type": "text",
+      "text": "The search returned a population for Norway of about 5,600,000. The result was labeled a \"mock figure\", so it may be a placeholder and not an official number.\n\n10% of 5,600,000 is **560,000**."
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 753,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 67
+  }
+}</code></pre><p>stop_reason=end_turn → loop exit (L434-L435). The request is the whole history: input tokens grow 587 → 685 → 753.</p></div>
+</section>
+
+<section><h2><span class="n">5</span>Limits</h2>
+<ul>
+<li>HTTP layer: headers (<code>x-api-key</code>, <code>anthropic-version</code>), the request id and the status code are not logged.</li>
+<li>Cost: not in the log; the USD figure comes from RESULT.md, computed from tokens and a price list.</li>
+<li>Time: per-call durations only. No end timestamp, so no wall-clock total, and no tool durations.</li>
+<li>stdout: what the program printed is outside the log, so behaviour 4's "only the answer goes to stdout" is shown by the code, not by this log.</li>
+<li>Text beside <code>tool_use</code>: both tool turns returned <code>content=[tool_use]</code> only (L138, L273), so this run never exercised the case where Claude writes text and asks for a tool in the same response.</li>
+<li>Echoed fields: the program sends assistant <code>tool_use</code> blocks back with the response-only <code>caller: {"type":"direct"}</code> field (L211-L213, L346-L348, L373-L375). The API accepted it.</li>
+<li>Log order: each <code>↻ iteration N/20</code> line is written after its request and response records (e.g. L50, L96, then L138).</li>
+</ul></section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+</script>
+</body>
+</html>

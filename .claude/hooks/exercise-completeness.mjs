@@ -1,6 +1,7 @@
 // exercise-completeness.mjs — Stop hook: when an exercise folder has uncommitted changes,
 // checks the definition of done from CLAUDE.md (README.md and RESULT.md with their
-// sections in order, curriculum row past "todo") and blocks the stop once with what is
+// sections in order, RESULT sections filled, Gist_<id>.html and Log_data_flow_<id>.html,
+// curriculum row past "todo") and blocks the stop once with what is
 // missing. On the retry Claude Code sets stop_hook_active, and the hook lets the stop go.
 
 import { join } from "node:path";
@@ -20,7 +21,7 @@ runHook("exercise-completeness", () => {
   const statusById = new Map(readTasks().map((t) => [t.id, t.status]));
   const report = [];
   for (const ex of changedExercises(PROJECT_ROOT)) {
-    const problems = completenessProblems(join(PROJECT_ROOT, ...ex.folder.split("/")), statusById.get(ex.id));
+    const problems = completenessProblems(join(PROJECT_ROOT, ...ex.folder.split("/")), statusById.get(ex.id), ex.id);
     if (problems.length) report.push(`${ex.folder}:\n${problems.map((p) => `  - ${p}`).join("\n")}`);
   }
   if (!report.length) return;

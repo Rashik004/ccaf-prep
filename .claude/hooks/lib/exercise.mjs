@@ -61,16 +61,51 @@ export function sectionProblems(markdown, required) {
   return problems;
 }
 
+// CLAUDE.md: "Exercise 1.3 predates these pages", so it is done without Gist and Log_data_flow.
+export const WRITEUP_EXEMPT = ["1.3"];
+
+const matches = (heading, name) => heading.toLowerCase().startsWith(name.toLowerCase());
+
+/**
+ * Required sections that are present but hold nothing: no line before the next H2 other
+ * than blanks and HTML comments. A sub-heading or a table counts as content.
+ */
+export function emptySections(markdown, required) {
+  const bodies = []; // [heading, has content] per H2, in order
+  let fenced = false;
+  for (const line of markdown.split(/\r?\n/)) {
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+    const m = !fenced && /^##\s+(?:\d+\.\s*)?(.+?)\s*#*\s*$/.exec(line);
+    if (m) bodies.push([m[1], false]);
+    else if (bodies.length && line.trim() && !/^\s*<!--.*-->\s*$/.test(line)) bodies.at(-1)[1] = true;
+  }
+  return required.filter((name) => {
+    const body = bodies.find(([h]) => matches(h, name));
+    return body !== undefined && !body[1];
+  });
+}
+
 /** Everything the definition of done in CLAUDE.md still lacks for one exercise. */
-export function completenessProblems(folderAbs, status) {
+export function completenessProblems(folderAbs, status, id) {
   const problems = [];
   for (const [file, required] of [
     ["README.md", README_SECTIONS],
     ["RESULT.md", RESULT_SECTIONS],
   ]) {
     const path = join(folderAbs, file);
-    if (!existsSync(path)) problems.push(`${file} is missing`);
-    else problems.push(...sectionProblems(readFileSync(path, "utf8"), required).map((p) => `${file}: ${p}`));
+    if (!existsSync(path)) {
+      problems.push(`${file} is missing`);
+      continue;
+    }
+    const text = readFileSync(path, "utf8");
+    problems.push(...sectionProblems(text, required).map((p) => `${file}: ${p}`));
+    // README sections are filled by the scaffold; RESULT sections only by a run and its write-up.
+    if (file === "RESULT.md") problems.push(...emptySections(text, required).map((s) => `${file}: section "${s}" is empty`));
+  }
+  if (!WRITEUP_EXEMPT.includes(id)) {
+    for (const page of [`Gist_${id}.html`, `Log_data_flow_${id}.html`]) {
+      if (!existsSync(join(folderAbs, page))) problems.push(`${page} is missing`);
+    }
   }
   if (status === undefined) problems.push("no row in docs/curriculum.md");
   else if (status === "todo") problems.push('curriculum status is still "todo"');

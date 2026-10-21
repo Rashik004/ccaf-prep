@@ -12,6 +12,7 @@ import {
   README_SECTIONS,
   RESULT_SECTIONS,
   completenessProblems,
+  emptySections,
   exerciseFolderFor,
   exerciseOf,
   headings,
@@ -57,13 +58,49 @@ describe("required sections", () => {
     assert.deepEqual(sectionProblems(readFileSync(join(TEMPLATES, "RESULT.md"), "utf8"), RESULT_SECTIONS), []);
   });
   test("exercise 1.3, the reference exercise, satisfies the check", () => {
-    assert.deepEqual(completenessProblems(join(PROJECT_ROOT, "Agent_Orc", "1.3_subagent_invocation"), "done"), []);
+    assert.deepEqual(completenessProblems(join(PROJECT_ROOT, "Agent_Orc", "1.3_subagent_invocation"), "done", "1.3"), []);
   });
   test("lists every gap of an empty folder", () => {
     const dir = mkdtempSync(join(tmpdir(), "ccaf-ex-"));
     try {
-      assert.deepEqual(completenessProblems(dir, "todo"), ["README.md is missing", "RESULT.md is missing", 'curriculum status is still "todo"']);
-      assert.ok(completenessProblems(dir, undefined).includes("no row in docs/curriculum.md"));
+      assert.deepEqual(completenessProblems(dir, "todo", "9.9"), [
+        "README.md is missing",
+        "RESULT.md is missing",
+        "Gist_9.9.html is missing",
+        "Log_data_flow_9.9.html is missing",
+        'curriculum status is still "todo"',
+      ]);
+      assert.ok(completenessProblems(dir, undefined, "9.9").includes("no row in docs/curriculum.md"));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  test("emptySections: blank and comment-only sections are empty, sub-headings and tables are content", () => {
+    const md = "# T\n## 1. Run\n\n<!-- todo -->\n## 2. Cost\n| a |\n|---|\n## 3. What happened\n### Run 2026-10-21\n## 4. Acceptance behaviours\n";
+    assert.deepEqual(emptySections(md, ["Run", "Cost", "What happened", "Acceptance behaviours"]), ["Run", "Acceptance behaviours"]);
+  });
+  test("emptySections ignores required sections that are missing", () => {
+    assert.deepEqual(emptySections("## Run\nx\n", ["Run", "Cost"]), []);
+  });
+  test("the RESULT template has six empty sections", () => {
+    assert.equal(emptySections(readFileSync(join(TEMPLATES, "RESULT.md"), "utf8"), RESULT_SECTIONS).length, 6);
+  });
+  test("a complete exercise needs filled RESULT sections and both HTML pages", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ccaf-ex-"));
+    try {
+      writeFileSync(join(dir, "README.md"), readFileSync(join(TEMPLATES, "README.md")));
+      writeFileSync(join(dir, "RESULT.md"), RESULT_SECTIONS.map((s, i) => `## ${i + 1}. ${s}\ntext\n`).join(""));
+      writeFileSync(join(dir, "Gist_2.1.html"), "x");
+      writeFileSync(join(dir, "Log_data_flow_2.1.html"), "x");
+      assert.deepEqual(completenessProblems(dir, "in progress", "2.1"), []);
+
+      rmSync(join(dir, "Gist_2.1.html"));
+      rmSync(join(dir, "Log_data_flow_2.1.html"));
+      assert.deepEqual(completenessProblems(dir, "in progress", "2.1"), ["Gist_2.1.html is missing", "Log_data_flow_2.1.html is missing"]);
+
+      writeFileSync(join(dir, "RESULT.md"), readFileSync(join(TEMPLATES, "RESULT.md")));
+      const empty = completenessProblems(dir, "in progress", "2.1").filter((p) => p.endsWith("is empty"));
+      assert.deepEqual(empty, RESULT_SECTIONS.map((s) => `RESULT.md: section "${s}" is empty`));
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -289,6 +326,7 @@ describe("hooks end to end", () => {
     assert.match(r.json.reason, /Agent_Orc\/9\.9_hook_selftest:/);
     assert.match(r.json.reason, /README\.md: section "What to watch for" is missing/);
     assert.match(r.json.reason, /RESULT\.md is missing/);
+    assert.match(r.json.reason, /Gist_9\.9\.html is missing/);
     assert.match(r.json.reason, /no row in docs\/curriculum\.md/);
     assert.match(r.json.reason, /Start no exercise run/);
     assert.doesNotMatch(r.json.reason, /1\.1_done/);

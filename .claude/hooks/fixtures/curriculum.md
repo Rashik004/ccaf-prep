@@ -1,5 +1,11 @@
 # Curriculum fixture for hooks.test.mjs
 
+## Domain 1: A (27%)
+
+## Domain 2: B (18%)
+
+## Domain 4: D (20%)
+
 | ID | Title | Lesson | Folder | Status |
 |---|---|---|---|---|
 | 1.1 | Alpha | https://example.test/1-1 | | todo |

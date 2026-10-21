@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1.1 Agentic Loops: gist</title>
+<style>
+:root{
+  --bg:#f7f6f2; --card:#ffffff; --ink:#1d1d1b; --muted:#6a6a64; --line:#d8d6cf;
+  --accent:#2f5fb3; --accent-bg:#e7eefb; --warn:#b3412f; --warn-bg:#fbe9e5; --code-bg:#f0efe9;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16171a; --card:#1f2024; --ink:#ecebe6; --muted:#a3a29b; --line:#3a3b40;
+    --accent:#86a9ef; --accent-bg:#1f2b44; --warn:#ef8e7c; --warn-bg:#3d2420; --code-bg:#26272c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16171a; --card:#1f2024; --ink:#ecebe6; --muted:#a3a29b; --line:#3a3b40;
+  --accent:#86a9ef; --accent-bg:#1f2b44; --warn:#ef8e7c; --warn-bg:#3d2420; --code-bg:#26272c;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:32px 16px 64px}
+a{color:var(--accent)}
+header .id{color:var(--muted);font-weight:600;letter-spacing:.04em}
+h1{font-size:1.8rem;margin:0 0 4px;overflow-wrap:anywhere}
+h2{font-size:1.25rem;margin:40px 0 8px;padding-top:8px;border-top:1px solid var(--line)}
+h2 .n{color:var(--muted);font-weight:500;margin-right:6px}
+h3{font-size:1.05rem;margin:0 0 4px}
+p{margin:6px 0}
+.sub{color:var(--muted);margin:4px 0 12px}
+nav{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.95rem}
+.note{background:var(--warn-bg);border-left:4px solid var(--warn);padding:10px 14px;border-radius:6px;margin:16px 0;font-size:.95rem}
+.tag{display:inline-block;background:var(--accent-bg);color:var(--accent);border-radius:999px;padding:0 8px;font-size:.8rem;font-weight:600}
+.mermaid{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin:14px 0;overflow-x:auto}
+.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:14px 0;min-width:0}
+.step .where{color:var(--muted);font-size:.9rem}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+pre{background:var(--code-bg);border-radius:8px;padding:10px 12px;overflow-x:auto;margin:8px 0;max-width:100%}
+pre code{background:none;padding:0;font-size:.85rem;overflow-wrap:normal}
+.tw{overflow-x:auto;margin:10px 0}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="id">Task 1.1</div>
+  <h1><a href="https://claudecertificationguide.com/learn/1-agentic-architecture/1-1-agentic-loops">Agentic Loops</a></h1>
+  <p class="sub">A hand-written agentic loop on the Messages API: call Claude, read stop_reason, run tools on tool_use, stop on end_turn.</p>
+  <nav><a href="README.md">README</a><a href="RESULT.md">RESULT</a><a href="Log_data_flow_1.1.html">Data flow</a></nav>
+</header>
+<section><h2><span class="n">1</span>Program flow</h2>
+<div class="mermaid">flowchart TD
+  M["index.ts main()"] --> T["tools.ts TOOLS<br/>calculator, web_search"]
+  T --> CT{"checks.ts<br/>checkToolsRegistered()"}
+  CT --> L["agent-loop.ts runAgentLoop()<br/>messages = [user prompt]"]
+  L --> API["client.messages.create()<br/>model, tools, messages"]
+  API --> SR{"stop_reason?"}
+  SR -- end_turn --> X["return text"]
+  SR -- tool_use --> RT["tools.ts runTool()<br/>for each tool_use block"]
+  SR -- other --> E["throw: unexpected stop_reason"]
+  RT --> ID{"checks.ts<br/>checkToolResultIds()"}
+  ID --> AP["append assistant turn +<br/>user turn of tool_results"]
+  AP --> CAP{"iteration &lt; 20?"}
+  CAP -- yes --> API
+  CAP -- no --> W["WARN cap reached, throw"]
+  X --> SQ{"checks.ts<br/>checkSequential()"}
+  SQ --> OUT["stdout: final answer"]</div></section>
+<section><h2><span class="n">2</span>Important steps</h2>
+<div class="step"><h3>1. Two tools, defined and checked before the first call</h3><p class="where"><code>src/tools.ts:16-30</code> · <code>src/checks.ts:24-39</code></p><pre><code>export const TOOLS: Anthropic.Tool[] = [
+  {
+    name: "calculator",
+    description:
+      "Evaluates an arithmetic expression and returns the numeric result. Use it for any " +
+      "arithmetic. Supports numbers, + - * / and parentheses, e.g. \"5600000 * 0.1\". " +
+      "Write numbers without thousands separators.",
+    input_schema: {
+      type: "object",
+      properties: {
+        expression: { type: "string", description: "The arithmetic expression to evaluate." },
+      },
+      required: ["expression"],
+    },
+  },</code></pre>
+<pre><code>export function checkToolsRegistered(tools: Anthropic.Tool[]): void {
+  const expected: Record&lt;string, string&gt; = { calculator: "expression", web_search: "query" };
+  const names = tools.map((t) =&gt; t.name);
+  if (tools.length !== 2 || !names.includes("calculator") || !names.includes("web_search")) {
+    throw new Error(`Step 1 (tools registered): expected calculator and web_search, got [${names}]`);
+  }
+  for (const tool of tools) {
+    const field = expected[tool.name];
+    if (!tool.description || tool.input_schema.type !== "object" || !tool.input_schema.required?.includes(field)) {
+      throw new Error(
+        `Step 1 (tools registered): ${tool.name} needs a description and an object input_schema requiring "${field}"`
+      );
+    }
+  }
+  logCheck(`tools registered: ${names.join(", ")} (input_schema ok)`);
+}</code></pre><p><strong>What:</strong> <code>TOOLS</code> holds the two tool definitions: a name, a description Claude reads when choosing, and a JSON Schema <code>input_schema</code>. <code>checkToolsRegistered()</code> throws unless both tools exist, each with an object schema and its required field, and logs <code>CHECK tools registered</code>.</p><p><strong>Why:</strong> Claude never runs a tool; it only picks one by name and writes input that fits the schema. Two tools, not one, make the choice of tool a model decision: that is the model-driven part of the loop. The array is sent with every request.</p><p><span class="tag">behaviour 1</span></p></div>
+<div class="step"><h3>2. The conversation is an array the code owns</h3><p class="where"><code>src/agent-loop.ts:27-41</code></p><pre><code>/** Step 6: a normal task ends by stop_reason long before this. Hitting it means something is wrong. */
+export const MAX_ITERATIONS = 20;
+
+export async function runAgentLoop(
+  client: Anthropic,
+  model: string,
+  prompt: string
+): Promise&lt;LoopResult&gt; {
+  // The API keeps no memory between calls: this array IS the conversation, and it is sent in full every time.
+  const messages: Anthropic.MessageParam[] = [{ role: "user", content: prompt }];
+  const toolCalls: ToolCall[] = [];
+  const usage = { input_tokens: 0, output_tokens: 0 };
+  logLoopStart(model, MAX_ITERATIONS);
+
+  for (let iteration = 1; iteration &lt;= MAX_ITERATIONS; iteration++) {</code></pre><p><strong>What:</strong> <code>messages</code> starts with the user prompt. <code>MAX_ITERATIONS = 20</code> bounds the <code>for</code> loop, and <code>logLoopStart()</code> writes <code>MAX_ITERATIONS=20</code> into the log.</p><p><strong>Why:</strong> The Messages API keeps no memory between calls, so this array <em>is</em> the conversation and goes out in full each turn. The cap is a safety net only; it is not how a normal run ends.</p><p><span class="tag">behaviour 2</span> <span class="tag">behaviour 6</span></p></div>
+<div class="step"><h3>3. One model call per iteration</h3><p class="where"><code>src/agent-loop.ts:42-52</code></p><pre><code>    // Step 2: send the request. tool_choice is left at its default ("auto"), so Claude decides
+    // whether to call a tool and which one, rather than following a sequence fixed in code.
+    // max_tokens caps one response; 1024 is ample here. Running out shows up as stop_reason "max_tokens".
+    // This object is the whole Messages API request body. It is logged now, before the
+    // messages array grows, so the log shows exactly what this call sent.
+    const request = { model, max_tokens: 1024, tools: TOOLS, messages };
+    logRequest(iteration, request);
+    const started = Date.now();
+    const response = await client.messages.create(request);
+    const ms = Date.now() - started;
+    logResponse(iteration, response, ms);</code></pre><p><strong>What:</strong> Builds the whole request body (model, <code>max_tokens</code>, tools, messages), logs it, calls <code>client.messages.create()</code> and logs the response with its duration.</p><p><strong>Why:</strong> <code>tool_choice</code> stays at its default <code>auto</code>, so Claude decides whether and which tool to call. Logging the request before the array grows makes the log show exactly what each call sent.</p><p><span class="tag">behaviour 2</span></p></div>
+<div class="step"><h3>4. Text is logged, never treated as done</h3><p class="where"><code>src/agent-loop.ts:54-70</code></p><pre><code>    usage.input_tokens += response.usage.input_tokens; // run totals; response.usage is this call only
+    usage.output_tokens += response.usage.output_tokens;
+    // Text may come with tool_use blocks ("Let me search for that"). It is logged on every turn,
+    // but returned only from the end_turn response: having text does not mean being done.
+    const text = response.content
+      .filter((b): b is Anthropic.TextBlock =&gt; b.type === "text")
+      .map((b) =&gt; b.text)
+      .join("\n");
+    logIteration({
+      iteration,
+      max: MAX_ITERATIONS,
+      stopReason: response.stop_reason,
+      blockTypes: response.content.map((b) =&gt; b.type),
+      usage: response.usage,
+      ms,
+    });
+    logAssistantText(text);</code></pre><p><strong>What:</strong> Adds this call's usage to the run totals, joins any text blocks, and logs <code>iteration N/20: messages.create -&gt; stop_reason=… content=[…]</code>.</p><p><strong>Why:</strong> Claude often writes "Let me look that up" next to a <code>tool_use</code> block. The <code>content=[…]</code> list makes that visible, and the loop goes on: having text does not mean being finished.</p><p><span class="tag">behaviour 2</span> <span class="tag">behaviour 6</span></p></div>
+<div class="step"><h3>5. end_turn is the only normal exit</h3><p class="where"><code>src/agent-loop.ts:72-83</code></p><pre><code>    // Step 4: end_turn is Claude saying the task is complete. It is the only normal exit.
+    if (response.stop_reason === "end_turn") {
+      logLoopExit(iteration, MAX_ITERATIONS);
+      return { text, iterations: iteration, toolCalls, usage };
+    }
+
+    // Any other value (max_tokens, refusal, ...) means "not finished, and not asking for a tool".
+    // Each needs its own handling (raise max_tokens, report the refusal); this exercise does not
+    // need them, so it stops loudly rather than treat the answer as complete or loop blindly.
+    if (response.stop_reason !== "tool_use") {
+      throw new Error(`Step 4 (stop_reason): unexpected stop_reason=${response.stop_reason}`);
+    }</code></pre><p><strong>What:</strong> On <code>stop_reason === "end_turn"</code> it logs the exit and returns the text. Any value other than <code>tool_use</code> throws.</p><p><strong>Why:</strong> This is the lesson's core rule: <code>stop_reason</code> alone decides. No phrase matching, no <code>content[0].type</code> check. An unexpected value such as <code>max_tokens</code> stops loudly instead of being taken as an answer.</p><p><span class="tag">behaviour 4</span></p></div>
+<div class="step"><h3>6. Run every tool_use block</h3><p class="where"><code>src/agent-loop.ts:85-106</code> · <code>src/tools.ts:69-84</code></p><pre><code>    // Step 3: run every tool_use block. A response can hold several, and each one needs its result.
+    const toolUses = response.content.filter(
+      (b): b is Anthropic.ToolUseBlock =&gt; b.type === "tool_use"
+    );
+    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+    for (const block of toolUses) {
+      const out = runTool(block.name, block.input); // both tools are local, so no await
+      const call: ToolCall = {
+        iteration,
+        id: block.id,
+        name: block.name,
+        input: block.input,
+        output: out.content,
+        isError: out.isError,
+      };
+      toolCalls.push(call);
+      logToolCall(call);
+      // tool_use_id ties this result to the request it answers.
+      toolResults.push({ type: "tool_result", tool_use_id: block.id, content: out.content, is_error: out.isError });
+    }
+    // Cannot fail as written; it guards the API rule (one result per tool_use id) against later edits.
+    checkToolResultIds(toolUses, toolResults);</code></pre>
+<pre><code>export function runTool(name: string, input: unknown): ToolOutput {
+  // A missing field arrives as the string "undefined", which the calculator rejects as an error.
+  const args = (input ?? {}) as Record&lt;string, unknown&gt;;
+  try {
+    switch (name) {
+      case "calculator":
+        return { content: JSON.stringify({ result: evaluate(String(args.expression)) }), isError: false };
+      case "web_search":
+        return { content: webSearch(String(args.query)), isError: false };
+      default:
+        return { content: `Unknown tool: ${name}`, isError: true };
+    }
+  } catch (err) {
+    return { content: `Error: ${err instanceof Error ? err.message : err}`, isError: true };
+  }
+}</code></pre><p><strong>What:</strong> Each <code>tool_use</code> block goes to <code>runTool()</code>, and its output becomes a <code>tool_result</code> carrying the block's id as <code>tool_use_id</code>. <code>checkToolResultIds()</code> asserts one result per id.</p><p><strong>Why:</strong> A response can hold several <code>tool_use</code> blocks, and the API rejects a turn that leaves one unanswered. A failing tool returns <code>is_error</code> instead of crashing, so Claude reads the error and can correct its input.</p><p><span class="tag">behaviour 3</span></p></div>
+<div class="step"><h3>7. Append both turns, then loop</h3><p class="where"><code>src/agent-loop.ts:108-115</code></p><pre><code>    // Append Claude's turn unchanged, then one user turn holding the tool_results. The assistant
+    // turn is not rebuilt from its text: the tool_use blocks and their ids must stay, because each
+    // tool_result refers back to one. Without both turns, the next request has no record of what
+    // was asked or found.
+    messages.push({ role: "assistant", content: response.content });
+    messages.push({ role: "user", content: toolResults });
+    logAppended(toolResults.map((r) =&gt; r.tool_use_id), messages.length);
+  }</code></pre><p><strong>What:</strong> Pushes Claude's response unchanged as the assistant turn, then one user turn holding the tool results, and logs <code>appended assistant + user(tool_result …) messages=&lt;n&gt;</code>.</p><p><strong>Why:</strong> The assistant turn keeps its <code>tool_use</code> blocks, because each <code>tool_result</code> refers back to one by id. Without both turns, the next request has no record of what was asked or found.</p><p><span class="tag">behaviour 3</span></p></div>
+<div class="step"><h3>8. The safety cap</h3><p class="where"><code>src/agent-loop.ts:117-119</code></p><pre><code>  // Step 6: the for loop ran out without returning, so Claude kept asking for tools for MAX_ITERATIONS turns.
+  logCapHit(MAX_ITERATIONS);
+  throw new Error(`Step 6 (safety cap): MAX_ITERATIONS=${MAX_ITERATIONS} reached without end_turn`);</code></pre><p><strong>What:</strong> Reached only when the loop ran 20 times without <code>end_turn</code>: logs <code>WARN cap reached</code> and throws, so the run exits non-zero.</p><p><strong>Why:</strong> The cap guards against a runaway loop. Hitting it is a failure to report, never a way to finish.</p><p><span class="tag">behaviour 6</span></p></div>
+<div class="step"><h3>9. The sequential test, checked in code</h3><p class="where"><code>src/checks.ts:64-94</code></p><pre><code>export function checkSequential(calls: ToolCall[], answer: string): void {
+  // Iterations that ran at least one tool: two means two separate round trips to Claude.
+  const toolIterations = new Set(calls.map((c) =&gt; c.iteration)).size;
+  // Calculator calls made after the first search (none if there was no search).
+  const firstSearch = calls.findIndex((c) =&gt; c.name === "web_search");
+  const calcAfterSearch =
+    firstSearch &lt; 0 ? [] : calls.slice(firstSearch + 1).filter((c) =&gt; c.name === "calculator");
+  // Did Claude carry the searched number into its calculation?
+  const usedValue = calcAfterSearch.some((c) =&gt; {
+    const { expression } = c.input as { expression?: unknown };
+    return mentionsNumber(String(expression ?? ""), SEARCH_VALUE);
+  });
+  const order = calls.map((c) =&gt; c.name).join(" -&gt; ");
+
+  if (toolIterations &lt; 2) {
+    throw new Error(`Step 5 (sequential): only ${toolIterations} tool iteration(s): ${order || "(none)"}`);
+  }
+  if (calcAfterSearch.length === 0) {
+    throw new Error(`Step 5 (sequential): no calculator call after web_search: ${order}`);
+  }
+  if (!usedValue) {
+    throw new Error(`Step 5 (sequential): no calculator expression uses the search value ${SEARCH_VALUE}`);
+  }
+  logCheck(`sequential: ${toolIterations} tool iterations, ${order}, search value used`);
+
+  // Wording varies run to run; this accepts "560,000" or "560000" but not "0.56 million".
+  if (!mentionsNumber(answer, EXPECTED_ANSWER)) {
+    throw new Error(`Step 5 (sequential): final answer does not state ${EXPECTED_ANSWER}`);
+  }
+  logCheck(`final answer states ${EXPECTED_ANSWER}`);
+}</code></pre><p><strong>What:</strong> Asserts at least two tool iterations, a <code>calculator</code> call after the first <code>web_search</code>, the searched value <code>5600000</code> in the calculator expression, and <code>560000</code> in the final answer.</p><p><strong>Why:</strong> The test prompt needs a search, then a calculation on its result. Claude has to chain the tools over separate round trips, carrying the value from one <code>tool_result</code> into the next <code>tool_use</code>.</p><p><span class="tag">behaviour 5</span></p></div>
+<div class="step"><h3>10. Only the answer goes to stdout</h3><p class="where"><code>src/index.ts:35-42</code></p><pre><code>  // Steps 2-4 and 6: the loop runs until Claude stops with stop_reason "end_turn".
+  const result = await runAgentLoop(new Anthropic(), model, prompt);
+
+  // Step 5: the test prompt needs a search, then a calculation on what it found.
+  checkSequential(result.toolCalls, result.text);
+
+  console.log(result.text); // the program's result is the only thing on stdout
+  logTotals(result.iterations, result.toolCalls.length, result.usage);</code></pre><p><strong>What:</strong> <code>main()</code> runs the loop, runs the sequential check, and prints the final text with <code>console.log</code>. Everything else goes to the log and stderr.</p><p><strong>Why:</strong> Redirecting stdout gives the clean answer the loop returned on <code>end_turn</code>.</p><p><span class="tag">behaviour 4</span> <span class="tag">behaviour 5</span></p></div>
+<h3>Acceptance behaviours → steps</h3>
+<div class="tw"><table><tr><th>Behaviour (README)</th><th>Steps</th></tr><tr><td>1. Two tools registered</td><td>1</td></tr><tr><td>2. Agentic loop on stop_reason</td><td>2, 3, 4</td></tr><tr><td>3. tool_use handled</td><td>6, 7</td></tr><tr><td>4. end_turn handled</td><td>5, 10</td></tr><tr><td>5. Sequential multi-tool test</td><td>9, 10</td></tr><tr><td>6. Safety cap 20</td><td>2, 4, 8</td></tr></table></div></section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+</script>
+</body>
+</html>

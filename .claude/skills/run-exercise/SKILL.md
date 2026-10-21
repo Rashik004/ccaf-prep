@@ -1,8 +1,7 @@
 ---
 name: run-exercise
-description: Run one exercise with npm start, analyse its log, fill in RESULT.md sections 1 to 3 from the log, and report which acceptance behaviours showed up. Each run calls the Anthropic API and costs money.
+description: Run one exercise with npm start, analyse its log, fill in RESULT.md sections 1 to 4 from the log, and report which acceptance behaviours showed up. Each run calls the Anthropic API and costs money.
 argument-hint: <task-id> [program arguments]
-disable-model-invocation: true
 ---
 
 Run the exercise for **$ARGUMENTS**. The first word is the task ID. The rest, if any, is the program's arguments. Typing this command is the user's approval to spend money on **one** run. A retry is a second run and needs the user's approval again.
@@ -31,15 +30,16 @@ Take the newest `*.log` in `<folder>/Log/` by modification time. It belongs to t
 
 Dispatch the **log-analyst** agent with the log path and the acceptance behaviours from the README's `## What it builds` section. Its report must have all eight headings (`Run`, `Timeline`, `Prompts sent`, `Tool calls`, `Handoffs`, `Tokens and cost`, `Anomalies`, `Acceptance evidence`). If a heading is missing, dispatch the agent again with its previous report and the names of the missing headings.
 
-## 5. Fill in RESULT.md sections 1 to 3
+## 5. Fill in RESULT.md sections 1 to 4
 
-Draft the three sections from the log-analyst report. Every fact comes from that report. Quote the log; do not paraphrase it.
+Draft the four sections from the log-analyst report. Every fact comes from that report. Quote the log; do not paraphrase it.
 
 - **`## 1. Run`**: the command, the date, the exit code and the log file name. If the run failed, start with `FAILED: <the ■ line>`.
 - **`## 2. Cost`**: the model or models, the number of model calls, the input and output tokens, and the total in USD. When there is more than one call, add a per-call table (for example, coordinator vs subagents, or retries).
 - **`## 3. What happened`**: a condensed trace in run order. Use quoted log excerpts for the prompts, the decisions, the handoffs and the tool calls.
+- **`## 4. Acceptance behaviours`**: one line per behaviour from the agent's `Acceptance evidence`: the behaviour, its verdict (SHOWN / NOT SHOWN / PARTLY) and the log line.
 
-Write the draft into RESULT.md under those three headings, keeping each heading word for word, only when all three sections are empty and the task is not `done`. Otherwise the sections hold a write-up someone already made from another run: show the user the draft and ask whether to replace them, keep them, or add this run below them as `### Run <date>`. Sections 4 to 6 belong to the user; leave them as they are.
+Write the draft into RESULT.md under those four headings, keeping each heading word for word, only when all four sections are empty and the task is not `done`. Otherwise the sections hold a write-up someone already made from another run: show the user the draft and ask whether to replace them, keep them, or add this run below them as `### Run <date>`. Sections 5 and 6 belong to the user (`/study-notes` drafts them with the user's approval); leave them as they are.
 
 ## 6. Report
 
@@ -48,4 +48,4 @@ Show the user:
 - the outcome and the total cost,
 - one line per acceptance behaviour: SHOWN / NOT SHOWN / PARTLY, with the log line,
 - the anomalies the agent found,
-- what is still open for "done" in `CLAUDE.md`: RESULT.md sections 4 to 6 (study points; the `/study-notes` skill is planned but not built), the README's cost line, and the curriculum status.
+- what is still open for "done" in `CLAUDE.md`, with the command for each: `/data-flow <id>` for `Log_data_flow_<id>.html`, `/gist <id>` if `Gist_<id>.html` is missing, `/study-notes <id>` for RESULT.md sections 5 and 6, then the README's cost line and the curriculum status.

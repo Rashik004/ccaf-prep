@@ -1,0 +1,83 @@
+<!doctype html>
+<!--
+  Shared shell for the per-exercise write-up pages (Gist_<id>.html, Log_data_flow_<id>.html).
+  Used by /gist and /data-flow. Each NAME below appears once in the page as a
+  double-brace placeholder; replace them all, and drop this comment from the page:
+    TITLE         <title>, e.g. "1.1 Agentic Loops: gist"
+    TASK_ID       e.g. 1.1
+    LESSON_TITLE  lesson title from docs/curriculum.md
+    LESSON_URL    lesson URL from docs/curriculum.md
+    SUMMARY       one-line summary of the page
+    NAV           <a> links: README.md, RESULT.md and the sibling page, relative
+    BODY          the page's <section>s
+  Building blocks for BODY:
+    <section><h2><span class="n">1</span>Title</h2> … </section>
+    <div class="mermaid">flowchart TD …</div>          one diagram, scrolls on its own
+    <div class="tw"><table>…</table></div>              tables scroll on their own
+    <pre><code>…</code></pre>                           code and JSON, HTML-escaped
+    <div class="step"><h3>…</h3><p class="where"><code>src/x.ts:12</code></p> … </div>
+    <span class="tag">reconstructed</span>   <p class="note">…</p>
+  Mermaid stays pinned to one version here; nothing else loads from outside the page.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+:root{
+  --bg:#f7f6f2; --card:#ffffff; --ink:#1d1d1b; --muted:#6a6a64; --line:#d8d6cf;
+  --accent:#2f5fb3; --accent-bg:#e7eefb; --warn:#b3412f; --warn-bg:#fbe9e5; --code-bg:#f0efe9;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16171a; --card:#1f2024; --ink:#ecebe6; --muted:#a3a29b; --line:#3a3b40;
+    --accent:#86a9ef; --accent-bg:#1f2b44; --warn:#ef8e7c; --warn-bg:#3d2420; --code-bg:#26272c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16171a; --card:#1f2024; --ink:#ecebe6; --muted:#a3a29b; --line:#3a3b40;
+  --accent:#86a9ef; --accent-bg:#1f2b44; --warn:#ef8e7c; --warn-bg:#3d2420; --code-bg:#26272c;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:32px 16px 64px}
+a{color:var(--accent)}
+header .id{color:var(--muted);font-weight:600;letter-spacing:.04em}
+h1{font-size:1.8rem;margin:0 0 4px;overflow-wrap:anywhere}
+h2{font-size:1.25rem;margin:40px 0 8px;padding-top:8px;border-top:1px solid var(--line)}
+h2 .n{color:var(--muted);font-weight:500;margin-right:6px}
+h3{font-size:1.05rem;margin:0 0 4px}
+p{margin:6px 0}
+.sub{color:var(--muted);margin:4px 0 12px}
+nav{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.95rem}
+.note{background:var(--warn-bg);border-left:4px solid var(--warn);padding:10px 14px;border-radius:6px;margin:16px 0;font-size:.95rem}
+.tag{display:inline-block;background:var(--accent-bg);color:var(--accent);border-radius:999px;padding:0 8px;font-size:.8rem;font-weight:600}
+.mermaid{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin:14px 0;overflow-x:auto}
+.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:14px 0;min-width:0}
+.step .where{color:var(--muted);font-size:.9rem}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+pre{background:var(--code-bg);border-radius:8px;padding:10px 12px;overflow-x:auto;margin:8px 0;max-width:100%}
+pre code{background:none;padding:0;font-size:.85rem;overflow-wrap:normal}
+.tw{overflow-x:auto;margin:10px 0}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="id">Task {{TASK_ID}}</div>
+  <h1><a href="{{LESSON_URL}}">{{LESSON_TITLE}}</a></h1>
+  <p class="sub">{{SUMMARY}}</p>
+  <nav>{{NAV}}</nav>
+</header>
+{{BODY}}
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+</script>
+</body>
+</html>
