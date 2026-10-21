@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1.6 Task Decomposition Strategies: gist</title>
+<style>
+:root{
+  --bg:#f7f6f2; --card:#ffffff; --ink:#1d1d1b; --muted:#6a6a64; --line:#d8d6cf;
+  --accent:#2f5fb3; --accent-bg:#e7eefb; --warn:#b3412f; --warn-bg:#fbe9e5; --code-bg:#f0efe9;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16171a; --card:#1f2024; --ink:#ecebe6; --muted:#a3a29b; --line:#3a3b40;
+    --accent:#86a9ef; --accent-bg:#1f2b44; --warn:#ef8e7c; --warn-bg:#3d2420; --code-bg:#26272c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16171a; --card:#1f2024; --ink:#ecebe6; --muted:#a3a29b; --line:#3a3b40;
+  --accent:#86a9ef; --accent-bg:#1f2b44; --warn:#ef8e7c; --warn-bg:#3d2420; --code-bg:#26272c;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:32px 16px 64px}
+a{color:var(--accent)}
+header .id{color:var(--muted);font-weight:600;letter-spacing:.04em}
+h1{font-size:1.8rem;margin:0 0 4px;overflow-wrap:anywhere}
+h2{font-size:1.25rem;margin:40px 0 8px;padding-top:8px;border-top:1px solid var(--line)}
+h2 .n{color:var(--muted);font-weight:500;margin-right:6px}
+h3{font-size:1.05rem;margin:0 0 4px}
+p{margin:6px 0}
+.sub{color:var(--muted);margin:4px 0 12px}
+nav{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.95rem}
+.note{background:var(--warn-bg);border-left:4px solid var(--warn);padding:10px 14px;border-radius:6px;margin:16px 0;font-size:.95rem}
+.tag{display:inline-block;background:var(--accent-bg);color:var(--accent);border-radius:999px;padding:0 8px;font-size:.8rem;font-weight:600}
+.mermaid{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin:14px 0;overflow-x:auto}
+.step{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:14px 0;min-width:0}
+.step .where{color:var(--muted);font-size:.9rem}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+pre{background:var(--code-bg);border-radius:8px;padding:10px 12px;overflow-x:auto;margin:8px 0;max-width:100%}
+pre code{background:none;padding:0;font-size:.85rem;overflow-wrap:normal}
+.tw{overflow-x:auto;margin:10px 0}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="id">Task 1.6</div>
+  <h1><a href="https://claudecertificationguide.com/learn/1-agentic-architecture/1-6-task-decomposition">Task Decomposition Strategies</a></h1>
+  <p class="sub">The same 10-file repo reviewed two ways: one single-pass call over every file, then a fixed chain of one local pass per file followed by an integration pass over the per-file summaries.</p>
+  <nav><a href="README.md">README</a><a href="RESULT.md">RESULT</a><a href="Log_data_flow_1.6.html">Data flow</a></nav>
+</header>
+<section><h2><span class="n">1</span>Program flow</h2>
+<p>Every model call goes through <code>review-call.ts reviewCall()</code>: one request, one response, a fresh context, structured JSON output. The code fixes the order of the calls (prompt chaining); the model never plans the next step.</p>
+<div class="mermaid">flowchart TD
+  M["index.ts main()"] --> LD["load-directory.ts loadDirectory()<br/>sorted by name, position 1..N"]
+  LD --> C1{"files &gt;= 10?"}
+  C1 -- no --> F1["throw: Step 1"]
+  C1 -- yes --> AK{"answer-key.ts answerKeyApplies()<br/>seeded lines still match?"}
+  AK --> SP["single-pass.ts singlePassReview()<br/>all N numbered() files in one user turn"]
+  SP --> SC1{"request holds all N files?"}
+  SC1 --> RC1["reviewCall() tag single-pass<br/>SINGLE_PASS_SCHEMA"]
+  RC1 --> SC2{"single-pass calls == 1?"}
+  SC2 --> D1["compare.ts depthLine(single-pass)<br/>OBSERVED"]
+  D1 --> LP["local-pass.ts localPasses()<br/>stage 1: for each file"]
+  LP --> RC2["reviewCall() tag local-pass file=…<br/>one file + interface ask<br/>LOCAL_PASS_SCHEMA"]
+  RC2 -- next file --> LP
+  RC2 -- all N done --> LC{"checkSchemaValid()<br/>checkBugCounts()"}
+  LC --> D2["depthLine(multi-pass)<br/>OBSERVED"]
+  D2 --> IP["integration-pass.ts integrationPass()<br/>stage 2: N summaries as JSON"]
+  IP --> IC1{"NUMBERED_LINE in request?"}
+  IC1 -- yes --> F2["throw: source leaked"]
+  IC1 -- no --> RC3["reviewCall() tag integration<br/>INTEGRATION_SCHEMA"]
+  RC3 --> IC2{"checkIssues()<br/>category valid, &gt;= 2 files"}
+  IC2 --> CC{"index.ts calls.length == N + 2?"}
+  CC --> CMP["compare.ts comparisonReport()<br/>counts, seeded caught"]
+  CMP --> DIL["dilution.ts dilutionReport()<br/>identical code, same verdict?"]
+  DIL --> OUT["stdout: report"]</div></section>
+<section><h2><span class="n">2</span>Important steps</h2>
+<p>Behaviours are numbered as in the README's <em>What it builds</em>.</p>
+<div class="tw"><table>
+<tr><th>Behaviour</th><th>Steps</th></tr>
+<tr><td>1. Load directory</td><td>1</td></tr>
+<tr><td>2. Single-pass review</td><td>2, 3, 4, 5, 10, 11</td></tr>
+<tr><td>3. Per-file local passes</td><td>2, 3, 4, 6, 7, 10, 11</td></tr>
+<tr><td>4. Cross-file integration pass</td><td>3, 4, 8, 9, 10</td></tr>
+<tr><td>5. Compare results</td><td>11, 12</td></tr>
+<tr><td>6. Dilution artefacts</td><td>13</td></tr>
+</table></div>
+
+<div class="step"><h3>1. Load the directory in a fixed order</h3><p class="where"><code>src/load-directory.ts:30-47</code></p><pre><code>export function loadDirectory(dir: string): SourceFile[] {
+  logPassStart(`Step 1: load directory ${dir}`);
+  // Plain name sort: the zero-padded prefixes (01_ ... 10_) make it the intended order.
+  const names = readdirSync(dir).filter(isSource).sort();
+  const files = names.map((name, i): SourceFile =&gt; {
+    const path = join(dir, name);
+    const text = readFileSync(path, "utf8");
+    return { position: i + 1, name, path, lines: sourceLines(text).length, text };
+  });
+  files.forEach(logFileRead);
+
+  if (files.length &lt; MIN_FILES) {
+    checkFailed("Step 1 (load directory)", `files&gt;=${MIN_FILES}`, `found ${files.length} .ts/.js files in ${dir}`);
+  }
+  logCheck(`files&gt;=${MIN_FILES}`);
+  log.out(`   ${files.length} files to review`);
+  return files;
+}</code></pre><p><strong>What:</strong> Reads every <code>.ts</code>/<code>.js</code> file, sorts the names, gives each file a 1-based <code>position</code>, and logs one <code>[i] &lt;path&gt; (&lt;n&gt; lines)</code> line per file. With fewer than 10 files it throws; otherwise it logs <code>CHECK files&gt;=10</code>.</p><p><strong>Why:</strong> Attention dilution depends on position: in one long context, the files near the end get less attention. A fixed order lets the later steps compare files 1-3 with files 8-10. Below 10 files there is too little to dilute, so the comparison would mean nothing.</p><p><span class="tag">behaviour 1</span></p></div>
+
+<div class="step"><h3>2. One rendering of the source for every pass</h3><p class="where"><code>src/load-directory.ts:54-59</code></p><pre><code>export function numbered(file: SourceFile): string {
+  const body = sourceLines(file.text)
+    .map((line, i) =&gt; `${String(i + 1).padStart(3)}│ ${line}`)
+    .join("\n");
+  return `=== FILE ${file.name} ===\n${body}`;
+}</code></pre><p><strong>What:</strong> Turns a file into a <code>=== FILE name ===</code> header plus numbered lines (<code>  12│ code</code>).</p><p><strong>Why:</strong> The single pass and the local passes use the same rendering, so the only difference between them is how many files share one context. The line numbers let each finding cite a real line, which the answer key scores. The <code>│</code> format is also what step 8 tests for to prove that no source reached the integration pass.</p><p><span class="tag">behaviour 2</span> <span class="tag">behaviour 3</span></p></div>
+
+<div class="step"><h3>3. One reviewer contract, three output schemas</h3><p class="where"><code>src/schemas.ts:14-20</code> · <code>src/schemas.ts:90-101</code></p><pre><code>export const REVIEWER_SYSTEM: string = [
+  "You are a senior TypeScript reviewer.",
+  "Report real bugs only: code that behaves wrongly at runtime, is unsafe, or breaks a caller.",
+  "Do not report style, naming or missing comments.",
+  "Each finding cites the exact line number from the numbered listing you were given.",
+  "Severity is one of critical, high, medium, low.",
+].join("\n");</code></pre>
+<pre><code>export const LOCAL_PASS_SCHEMA: Record&lt;string, unknown&gt; = {
+  type: "object",
+  additionalProperties: false,
+  required: ["file", "bug_count", "issues", "exports", "calls"],
+  properties: {
+    file: FILE_NAME,
+    bug_count: BUG_COUNT,
+    issues: ISSUES,
+    exports: { type: "array", items: EXPORT_FACT, description: "Every exported function of this file." },
+    calls: { type: "array", items: CALL_FACT, description: "Every call this file makes into another module of the repo." },
+  },
+};</code></pre><p><strong>What:</strong> All three passes get the same system prompt. The single-pass and local-pass schemas share the per-file shape <code>{file, bug_count, issues[{line, severity, description}]}</code>. The local schema adds <code>exports</code> (signature, behaviour) and <code>calls</code> (line, callee, arguments, expects). <code>INTEGRATION_SCHEMA</code> (<code>schemas.ts:104-131</code>) allows only <code>data_flow</code>, <code>api_consistency</code> and <code>pattern_consistency</code> issues.</p><p><strong>Why:</strong> With the prompt and output shape the same, any difference between the two approaches comes from the context alone. The <code>exports</code>/<code>calls</code> facts are the handoff from stage 1 to stage 2: the integration pass reasons over them in place of the source.</p><p><span class="tag">behaviour 2</span> <span class="tag">behaviour 3</span> <span class="tag">behaviour 4</span></p></div>
+
+<div class="step"><h3>4. Every pass is one fresh-context call</h3><p class="where"><code>src/review-call.ts:38-47</code> · <code>src/review-call.ts:57-59</code></p><pre><code>  const request = {
+    model: input.model,
+    max_tokens: 16000,
+    system: input.system,
+    messages: [{ role: "user" as const, content: input.user }],
+    output_config: { format: { type: "json_schema" as const, schema: input.schema } },
+  };
+  logRequest(input.tag, request);
+  const started = Date.now();
+  const response = await client.messages.create(request);</code></pre>
+<pre><code>  if (response.stop_reason !== "end_turn") {
+    throw new Error(`[${input.tag}] unexpected stop_reason=${response.stop_reason}`);
+  }</code></pre><p><strong>What:</strong> Sends one user turn with structured output (<code>output_config.format</code> <code>json_schema</code>), logs the request and the response under the pass tag, records the usage in <code>calls</code>, and throws on any stop reason other than <code>end_turn</code>. It then parses the text block as JSON.</p><p><strong>Why:</strong> The API keeps no memory between calls, so the model sees only what this request carries: all the files, one file, or the summaries. Decomposition is the choice of what goes into <code>input.user</code>. There are no tools and no loop, because the program, not the model, decides the sequence.</p><p><span class="tag">behaviour 2</span> <span class="tag">behaviour 3</span> <span class="tag">behaviour 4</span></p></div>
+
+<div class="step"><h3>5. The single pass: every file in one context</h3><p class="where"><code>src/single-pass.ts:18-23</code> · <code>src/single-pass.ts:43-48</code> · <code>src/single-pass.ts:58-63</code></p><pre><code>function singlePassRequest(files: SourceFile[]): string {
+  const ask =
+    `Review all ${files.length} files below. Return one entry per file, in the order given, ` +
+    `even when a file has no bugs.`;
+  return [ask, ...files.map(numbered)].join("\n\n");
+}</code></pre>
+<pre><code>  // The baseline is only fair if every file really is in the one context.
+  const missing = files.filter((f) =&gt; !user.includes(`=== FILE ${f.name} ===`));
+  if (missing.length &gt; 0) {
+    checkFailed("Step 2 (single-pass)", `single-pass request holds all ${files.length} files`, `missing ${missing.map((f) =&gt; f.name).join(", ")}`);
+  }
+  logCheck(`single-pass request holds all ${files.length} files`);</code></pre>
+<pre><code>  // One call is what makes this the single-pass baseline.
+  const count = callsTagged(TAG);
+  if (count !== 1) {
+    checkFailed("Step 2 (single-pass)", "single-pass calls==1", `made ${count} calls`);
+  }
+  logCheck("single-pass calls==1");</code></pre><p><strong>What:</strong> Joins every numbered file into one user turn. It checks that each <code>=== FILE</code> header is present, makes the call, and checks that exactly one <code>single-pass</code> call happened. If the model leaves out a file, <code>alignToFiles()</code> gives that file an empty review instead of failing.</p><p><strong>Why:</strong> This is the baseline the lesson warns against: every file competes for attention in the same context. A skipped file counts as dilution evidence, not as a program error.</p><p><span class="tag">behaviour 2</span></p></div>
+
+<div class="step"><h3>6. Stage 1: one local pass per file, plus its interface</h3><p class="where"><code>src/local-pass.ts:20-29</code> · <code>src/local-pass.ts:39-52</code></p><pre><code>function localPassRequest(file: SourceFile): string {
+  return [
+    `Review this one file.`,
+    `Also describe its interface, for a later reviewer who will not see the source:`,
+    `- exports: each exported function's signature and behaviour (units of the result, what happens when nothing is found).`,
+    `- calls: each call into another module of the repo, with its line, callee, arguments as written, and what this caller expects back.`,
+    "",
+    numbered(file),
+  ].join("\n");
+}</code></pre>
+<pre><code>  // Within stage 1 the calls are independent (no call reads another's output), so they
+  // could run in parallel; they run one after another only to keep the log readable.
+  // Stage 2 must wait for all of them: that dependency is what makes this a chain.
+  for (const file of files) {
+    const review = await reviewCall&lt;LocalReview&gt;(client, {
+      model,
+      tag: `local-pass file=${file.name}`,
+      system: REVIEWER_SYSTEM,
+      user: localPassRequest(file),
+      schema: LOCAL_PASS_SCHEMA,
+    });
+    reviews.push(review);
+    log.out(`   [${file.position}] ${file.name}: ${review.issues.length} findings`);
+  }</code></pre><p><strong>What:</strong> Makes one call per file, each holding a single file, and asks for the bugs plus the file's exports and its calls into other modules.</p><p><strong>Why:</strong> A file reviewed alone gets the model's full attention, so file 10 gets the same scrutiny as file 1. That is the structural fix for dilution. A local pass cannot see a bug that sits between two files, so it records the interface facts that stage 2 will need.</p><p><span class="tag">behaviour 3</span></p></div>
+
+<div class="step"><h3>7. Guard the summaries before stage 2 trusts them</h3><p class="where"><code>src/local-pass.ts:54-58</code> · <code>src/local-pass.ts:88-95</code></p><pre><code>  // Checked once every file is in, so the log holds all N results before any failure.
+  // Stage 2 must not start on a bad summary, so these run before integrationPass.
+  checkSchemaValid(files, reviews);
+  checkBugCounts(reviews);
+  return reviews;</code></pre>
+<pre><code>/** bug_count must equal the number of issues: a rule the JSON Schema cannot express. */
+function checkBugCounts(reviews: LocalReview[]) {
+  const wrong = reviews.find((r) =&gt; r.bug_count !== r.issues.length);
+  if (wrong) {
+    checkFailed("Step 3 (local passes)", "bug_count==issues.length", `${wrong.file}: bug_count=${wrong.bug_count}, issues=${wrong.issues.length}`);
+  }
+  logCheck("bug_count==issues.length");
+}</code></pre><p><strong>What:</strong> <code>checkSchemaValid()</code> confirms that each summary has the <code>LocalReview</code> shape and names the right file (<code>CHECK local-pass schema-valid N/N</code>). <code>checkBugCounts()</code> confirms that <code>bug_count</code> equals <code>issues.length</code>.</p><p><strong>Why:</strong> In a chain, each stage consumes the one before it. A wrong summary would mislead the integration pass without any error, so the run stops before stage 2 starts.</p><p><span class="tag">behaviour 3</span></p></div>
+
+<div class="step"><h3>8. Stage 2 reads summaries, never source</h3><p class="where"><code>src/integration-pass.ts:22-34</code> · <code>src/integration-pass.ts:45-53</code></p><pre><code>function integrationRequest(summaries: LocalReview[]): string {
+  return [
+    `Below are per-file summaries of a ${summaries.length}-file TypeScript repo, one per file,`,
+    `each with its local findings, its exports and its calls into other modules. You do not have the source.`,
+    `Report only issues that span two or more files, in three categories:`,
+    `- data_flow: a value changes meaning on its way between files (units, null vs throw).`,
+    `- api_consistency: a call does not match the signature or behaviour of the export it targets.`,
+    `- pattern_consistency: the same job is done differently, or a bug is handled differently, across files.`,
+    `Do not repeat a bug that sits inside one file.`,
+    "",
+    JSON.stringify(summaries, null, 2),
+  ].join("\n");
+}</code></pre>
+<pre><code>  // The decomposition holds only if this pass works from summaries. One numbered source
+  // line in the request would mean raw code leaked into the second stage.
+  if (NUMBERED_LINE.test(user)) {
+    checkFailed("Step 4 (integration pass)", "integration input=summaries", "request contains a numbered source line");
+  }
+  logCheck("integration input=summaries");
+  // `files` is used only here, to measure how much smaller the input is. It is never sent.
+  const sourceChars = files.reduce((n, f) =&gt; n + f.text.length, 0);
+  log.out(`   input: ${user.length} chars of summaries vs ${sourceChars} chars of raw source`);</code></pre><p><strong>What:</strong> Builds the stage 2 request from the N JSON summaries and the three categories. It fails if any <code>NUMBERED_LINE</code> (<code>  12│ </code>) appears in the request, then logs the size of the summaries against the size of the source.</p><p><strong>Why:</strong> The integration pass compares each call against the export it targets, which no local pass can do. Feeding it the raw source would bring dilution back. The size line makes the cost visible: in the cited run the summaries were larger than the source (see RESULT.md).</p><p><span class="tag">behaviour 4</span></p></div>
+
+<div class="step"><h3>9. A cross-file issue must name two or more files</h3><p class="where"><code>src/integration-pass.ts:78-83</code></p><pre><code>  // The schema cannot say "two or more", so code says it: an issue in one file is a local finding.
+  const singleFile = issues.findIndex((i) =&gt; i.files.length &lt; 2);
+  if (singleFile &gt;= 0) {
+    checkFailed("Step 4 (integration pass)", "integration issues name &gt;=2 files", `issue ${singleFile} names ${issues[singleFile].files.length} file(s)`);
+  }
+  logCheck("integration issues name &gt;=2 files");</code></pre><p><strong>What:</strong> After the integration call, <code>checkIssues()</code> checks that every category is one of the three allowed values and that every issue names at least two files. It then prints each issue.</p><p><strong>Why:</strong> It keeps the two stages' jobs apart: a bug inside one file belongs to stage 1, and stage 2 reports only what lies between files.</p><p><span class="tag">behaviour 4</span></p></div>
+
+<div class="step"><h3>10. The shape of the decomposition, counted</h3><p class="where"><code>src/index.ts:65-71</code></p><pre><code>  // The decomposition's shape, counted: 1 single-pass call + N local calls + 1 integration
+  // call, and no others. Runs after the calls, so it catches a stray call; it prevents none.
+  const expected = files.length + 2;
+  if (calls.length !== expected) {
+    checkFailed("Steps 2-4 (call count)", `model calls==${expected}`, `made ${calls.length}`);
+  }
+  logCheck(`model calls==${expected}`);</code></pre><p><strong>What:</strong> Checks that the run made exactly N + 2 model calls: 12 for the sample repo.</p><p><strong>Why:</strong> Prompt chaining is a fixed sequence set in code, so its call count is known in advance. A different count means the decomposition did not run as designed.</p><p><span class="tag">behaviour 2</span> <span class="tag">behaviour 3</span> <span class="tag">behaviour 4</span></p></div>
+
+<div class="step"><h3>11. Depth by position: files 1-3 against the last three</h3><p class="where"><code>src/compare.ts:44-54</code></p><pre><code>export function depthLine(label: "single-pass" | "multi-pass", reviews: FileReview[]): string {
+  const n = reviews.length;
+  const early = average(reviews.slice(0, 3));
+  const late = average(reviews.slice(Math.max(n - 3, 0)));
+  const verdict = late &lt; early ? "observed" : "not observed";
+  const line =
+    `depth ${label}: files 1-3 avg ${early.toFixed(1)}, files ${n - 2}-${n} avg ${late.toFixed(1)}` +
+    ` — drop-off ${verdict}`;
+  logObservation(line);
+  return line;
+}</code></pre><p><strong>What:</strong> Averages the findings per file over the first three and the last three files, and reports <code>drop-off observed</code> or <code>not observed</code>. It logs the result as <code>OBSERVED</code> and never throws.</p><p><strong>Why:</strong> Dilution shows up as fewer findings for later files. The sample repo plants local bugs at both ends, so a drop reflects attention rather than where the bugs are. Because this is a model-quality outcome, a run that shows no drop is still a valid result.</p><p><span class="tag">behaviour 2</span> <span class="tag">behaviour 3</span> <span class="tag">behaviour 5</span></p></div>
+
+<div class="step"><h3>12. Score against the planted bugs, not the totals</h3><p class="where"><code>src/compare.ts:108-111</code> · <code>src/compare.ts:132-139</code></p><pre><code>function caughtByMultiPass(seed: SeededIssue, local: LocalReview[], integration: CrossFileIssue[]): boolean {
+  if (seed.kind === "local") return caught(seed, local);
+  return caughtByIntegration(seed, integration) || caught(seed, local);
+}</code></pre>
+<pre><code>  // The integration pass's own contribution: bugs the single pass missed and only the summaries exposed.
+  const onlyIntegration = SEEDED.filter(
+    (s) =&gt; s.kind === "cross_file" &amp;&amp; caughtByIntegration(s, integration) &amp;&amp; !caught(s, single)
+  );
+  lines.push("  Cross-file issues found only by the integration pass:");
+  if (onlyIntegration.length === 0) lines.push("    (none)");
+  for (const s of onlyIntegration) lines.push(`    ${s.id} ${s.file}:${s.line} ${s.description}`);
+  return lines.join("\n");</code></pre><p><strong>What:</strong> <code>comparisonReport()</code> prints the per-file counts for both approaches, the totals (multi-pass = local + cross-file), the spread, and the 9 seeded issues with a yes/no for each approach. A finding counts when it lands within 2 lines of a seed. A cross-file seed counts for the integration pass when one issue names both of its files (<code>answer-key.ts:81-87</code>).</p><p><strong>Why:</strong> A long list of findings is not the same as the right list. The answer key, checked against the files before any paid call, turns "more findings" into "planted bugs found". The last list isolates what stage 2 alone added.</p><p><span class="tag">behaviour 5</span></p></div>
+
+<div class="step"><h3>13. Identical code, same verdict?</h3><p class="where"><code>src/dilution.ts:13-18</code> · <code>src/answer-key.ts:29-37</code></p><pre><code>function verdictLine(label: string, pattern: IdenticalPattern, reviews: FileReview[]): { text: string; artefact: boolean } {
+  const verdicts = pattern.sites.map((site) =&gt; flaggedAt(site, reviews));
+  const artefact = verdicts.some((v) =&gt; v !== verdicts[0]);
+  const sites = pattern.sites.map((s, i) =&gt; `${s.file}:${s.line} ${verdicts[i] ? "flagged" : "approved"}`);
+  return { text: `    ${label.padEnd(12)}${sites.join("; ")} -&gt; ${artefact ? "ARTEFACT" : "consistent"}`, artefact };
+}</code></pre>
+<pre><code>export const IDENTICAL_PATTERNS: IdenticalPattern[] = [
+  {
+    pattern: "items.forEach(async (i) =&gt; { await save(i); });",
+    sites: [
+      { file: "02_product-repo.ts", line: 27 },
+      { file: "10_sync-job.ts", line: 30 },
+    ],
+  },
+];</code></pre><p><strong>What:</strong> For the byte-identical <code>forEach(async)</code> line in file 02 and file 10, it records whether each approach flagged or approved each site. It prints <code>ARTEFACT</code> when the two verdicts differ and <code>consistent</code> when they match, and logs the outcome as <code>OBSERVED</code>.</p><p><strong>Why:</strong> Identical code deserves identical verdicts. A difference can come only from the file's position in the context: the lesson's "contradictory feedback" symptom of attention dilution. It is reported rather than asserted, because a strong model on small files may not show it.</p><p><span class="tag">behaviour 6</span></p></div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+</script>
+</body>
+</html>

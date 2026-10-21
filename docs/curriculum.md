@@ -15,7 +15,7 @@ Folder: `Agent_Orc/`
 | 1.3 | Subagent Invocation and Context Passing | https://claudecertificationguide.com/learn/1-agentic-architecture/1-3-subagent-invocation-context | `Agent_Orc/1.3_subagent_invocation` | done |
 | 1.4 | Workflow Enforcement and Handoff | https://claudecertificationguide.com/learn/1-agentic-architecture/1-4-workflow-enforcement-handoff | | todo |
 | 1.5 | Agent SDK Hooks | https://claudecertificationguide.com/learn/1-agentic-architecture/1-5-agent-sdk-hooks | | todo |
-| 1.6 | Task Decomposition Strategies | https://claudecertificationguide.com/learn/1-agentic-architecture/1-6-task-decomposition | | todo |
+| 1.6 | Task Decomposition Strategies | https://claudecertificationguide.com/learn/1-agentic-architecture/1-6-task-decomposition | `Agent_Orc/1.6_task_decomposition` | in progress |
 | 1.7 | Session State and Resumption | https://claudecertificationguide.com/learn/1-agentic-architecture/1-7-session-state-resumption | | todo |
 
 ## Domain 2: Tool Design & MCP Integration (18%)
